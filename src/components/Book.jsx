@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { gsap } from 'gsap'
-import { COVER_W, EDGE_ZONE, SHEET_T } from '../constants.js'
+import { COVER_W, EDGE_ZONE, PAGE_H, SHEET_T } from '../constants.js'
 import { FACES, SHEET_COUNT, spreadForFace } from '../data/compileBook.js'
 import { renderPageFace, renderEndpaper } from '../three/pageTexture.js'
 import {
@@ -33,12 +33,16 @@ const CLOSED_STACK_TOP = N * SHEET_T
 export default function Book() {
   const dragRef = useRef()
   const liftGroupRef = useRef()
+  const nudgeRef = useRef()
   const alignRef = useRef()
   const coverPivotRef = useRef()
   const sheetGroupRef = useRef()
   const sheetMaterialsRef = useRef(null)
+  const ribbonRef = useRef()
   const leftFaceIdxRef = useRef(null)
   const rightFaceIdxRef = useRef(null)
+  const effLeftRef = useRef(0)
+  const effRightRef = useRef(N)
 
   const openRef = useRef({ p: 0 })
   const liftRef = useRef({ v: 0 })
@@ -107,6 +111,8 @@ export default function Book() {
   if (rightFaceIdx > 2 * N - 1) rightFaceIdx = null
   leftFaceIdxRef.current = leftFaceIdx
   rightFaceIdxRef.current = rightFaceIdx
+  effLeftRef.current = effLeft
+  effRightRef.current = effRight
 
   const visibleFaces = useMemo(() => {
     const list = []
@@ -234,9 +240,10 @@ export default function Book() {
     })
   }, [resetToken])
 
-  // continuous transforms: opening, alignment, lift, idle breathing
+  // continuous transforms: opening, alignment, lift, idle breathing, flutter clock
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime()
+    uniforms.uTime.value = t
     const p = openRef.current.p
     const cover = coverPivotRef.current
     if (cover) {
@@ -252,7 +259,26 @@ export default function Book() {
       const sc = 1 + v * 0.05
       lift.scale.set(sc, sc, sc)
     }
+    // red ribbon rides the gutter, appearing as the book opens
+    const ribbon = ribbonRef.current
+    if (ribbon) {
+      ribbon.visible = p > 0.6
+      ribbon.position.z = Math.max(effLeftRef.current, effRightRef.current) * SHEET_T + 0.006
+      ribbon.material.opacity = (p - 0.6) * 2.5
+    }
   })
+
+  /** A small physical reaction — the book flinches when poked. */
+  const nudge = useCallback((strength = 1) => {
+    const g = nudgeRef.current
+    if (!g) return
+    gsap.killTweensOf(g.rotation)
+    gsap.killTweensOf(g.position)
+    g.rotation.z = 0.012 * strength * (Math.random() > 0.5 ? 1 : -1)
+    g.position.y = -0.015 * strength
+    gsap.to(g.rotation, { z: 0, duration: 0.7, ease: 'elastic.out(1.4, 0.28)' })
+    gsap.to(g.position, { y: 0, duration: 0.6, ease: 'elastic.out(1.4, 0.3)' })
+  }, [])
 
   // ---- interaction handlers --------------------------------------------
   const bodyDouble = useCallback(() => {
@@ -267,8 +293,9 @@ export default function Book() {
   const bodyClick = useCallback(() => {
     const s = useBookStore.getState()
     if (!s.isOpen && !s.opening) return openBook()
-    if (s.focusedImage) s.focusImage(null)
-  }, [openBook])
+    if (s.focusedImage) return s.focusImage(null)
+    nudge(0.7) // the book flinches when poked
+  }, [openBook, nudge])
 
   /**
    * Double-click on a page face, resolved in spec priority order:
@@ -290,13 +317,20 @@ export default function Book() {
         if (logo) return s.setNavOpen(true)
         const idx = regions.find((r) => r.type === 'index' && inRect(uv, r))
         if (idx) return jumpToFace(idx.faceIndex)
+        const egg = regions.find((r) => r.type === 'egg' && inRect(uv, r))
+        if (egg) {
+          // DO NOT PRESS was pressed. Naturally.
+          s.triggerEgg()
+          nudge(2.2)
+          return
+        }
         if (side === 'right' && uv.x > 1 - EDGE_ZONE) return doTurn(1)
         if (side === 'left' && uv.x < EDGE_ZONE) return doTurn(-1)
       }
       if (s.focusedImage) return s.focusImage(null)
       s.held ? s.putDown() : s.pickUp()
     },
-    [faceRender, doTurn, jumpToFace, openBook]
+    [faceRender, doTurn, jumpToFace, openBook, nudge]
   )
 
   const emblemActivate = useCallback(() => {
@@ -311,6 +345,7 @@ export default function Book() {
     <group rotation={[-0.12, 0, 0]}>
       <group ref={dragRef}>
         <group ref={liftGroupRef}>
+          <group ref={nudgeRef}>
           <group
             ref={alignRef}
             onClick={bodyClick}
@@ -358,8 +393,15 @@ export default function Book() {
               onBodyClick={bodyClick}
             />
 
+            {/* red page ribbon draped down the gutter */}
+            <mesh ref={ribbonRef} position={[0.01, -PAGE_H / 2 + 0.32, 0.1]} rotation={[0, 0, 0.02]} raycast={() => null} visible={false}>
+              <planeGeometry args={[0.075, 0.85]} />
+              <meshStandardMaterial color="#7a1f1f" roughness={0.55} transparent opacity={0} side={THREE.DoubleSide} />
+            </mesh>
+
             <FloatingImages visibleFaces={visibleFaces} />
             <BookNavigation z={navZ} />
+          </group>
           </group>
         </group>
       </group>

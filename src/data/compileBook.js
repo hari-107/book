@@ -9,6 +9,9 @@ import { sections, structural } from './bookContent.js'
  *   spreads — after turning k sheets the open book shows
  *            [ back of sheet k-1 | front of sheet k ] = [ face 2k-1 | face 2k ].
  *
+ * Face order: Welcome (right), then Title (left) + Index (right) share a
+ * spread — matching the reference mockup — then the sections, then The End.
+ *
  * Index entries and navigation targets are resolved to face indices here so
  * every page id can be jumped to directly.
  */
@@ -17,6 +20,7 @@ function makeFace(page, section, kind) {
   return {
     id: page.id,
     kind, // 'structural' | 'content' | 'blank'
+    theme: page.theme ?? (section ? section.theme : null),
     sectionId: section ? section.id : null,
     sectionTitle: section ? section.title : null,
     heading: page.heading ?? '',
@@ -27,7 +31,11 @@ function makeFace(page, section, kind) {
 
 const faces = []
 faces.push(makeFace(structural.welcome, null, 'structural'))
-faces.push({ ...makeFace({ id: 'index', heading: 'Index', blocks: [], images: [] }, null, 'structural'), isIndex: true })
+faces.push(makeFace(structural.title, null, 'structural'))
+faces.push({
+  ...makeFace({ id: 'index', heading: 'INDEX', theme: 'index', blocks: [], images: [] }, null, 'structural'),
+  isIndex: true,
+})
 
 for (const section of sections) {
   section.pages.forEach((page, i) => {
@@ -41,7 +49,7 @@ faces.push(makeFace(structural.end, null, 'structural'))
 
 // A sheet needs two faces — pad with a blank so the count is even.
 if (faces.length % 2 !== 0) {
-  faces.push({ id: 'blank-pad', kind: 'blank', sectionId: null, sectionTitle: null, heading: '', blocks: [], images: [] })
+  faces.push({ id: 'blank-pad', kind: 'blank', theme: null, sectionId: null, sectionTitle: null, heading: '', blocks: [], images: [] })
 }
 
 faces.forEach((f, i) => {
@@ -58,11 +66,20 @@ export function spreadForFace(f) {
   return f % 2 === 0 ? f / 2 : (f + 1) / 2
 }
 
-/** Exactly six Index entries — one per content section, targeting its first page. */
-export const INDEX_ENTRIES = sections.map((s) => {
-  const first = faces.find((f) => f.sectionId === s.id)
-  return { sectionId: s.id, title: s.title, faceIndex: first.faceIndex, pageNumber: first.pageNumber }
-})
+/**
+ * The adventure Index — one entry per content section plus The End,
+ * each targeting its first page (mockup-approved 10-entry structure).
+ */
+export const INDEX_ENTRIES = [
+  ...sections.map((s) => {
+    const first = faces.find((f) => f.sectionId === s.id)
+    return { sectionId: s.id, title: s.title, faceIndex: first.faceIndex, pageNumber: first.pageNumber }
+  }),
+  (() => {
+    const end = faces.find((f) => f.id === 'the-end')
+    return { sectionId: 'the-end', title: 'The End', faceIndex: end.faceIndex, pageNumber: end.pageNumber }
+  })(),
+]
 
 /** Everything reachable by the logo navigation — every face, including deeper section pages. */
 export const NAV_ITEMS = faces
@@ -71,7 +88,7 @@ export const NAV_ITEMS = faces
     id: f.id,
     faceIndex: f.faceIndex,
     pageNumber: f.pageNumber,
-    label: f.heading || (f.kind === 'structural' ? 'Colophon' : 'Untitled'),
+    label: f.heading || (f.id === 'title' ? 'Title Page' : 'Untitled'),
     sectionTitle: f.sectionTitle,
     isSectionStart: !!f.isSectionStart,
   }))

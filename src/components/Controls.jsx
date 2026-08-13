@@ -2,25 +2,53 @@ import { useEffect, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { gsap } from 'gsap'
-import { CAMERA_DEFAULT_Z, CAMERA_MIN_Z, CAMERA_MAX_Z } from '../constants.js'
+import { CAMERA_MIN_Z, CAMERA_MAX_Z, FIT_HALF_W, FIT_HALF_H } from '../constants.js'
 import { useBookStore } from '../store/useBookStore.js'
 
 /**
  * Camera + input layer. No UI is rendered here — this only wires:
- *  - drag to rotate the held book (trackball feel, object rotates, not camera)
+ *  - a close, desk-side camera that always keeps the huge book framed
+ *    (~85-95% of the viewport), recomputed per aspect ratio on resize
+ *  - subtle pointer parallax and a gentle push-in while pages turn
+ *  - drag to rotate the held book (the object rotates, not the camera)
  *  - wheel / pinch zoom with clamped limits
  *  - keyboard: ← → page turns, R reset, Esc dismiss
  * Mouse and touch drive the same interaction model.
  */
 export default function Controls() {
-  const { camera, gl } = useThree()
-  const zoom = useRef({ target: CAMERA_DEFAULT_Z })
+  const { camera, gl, size } = useThree()
+  const zoom = useRef({ target: 3, fit: 3, push: 0 })
+  const sway = useRef({ x: 0, y: 0 })
   const resetToken = useBookStore((s) => s.resetToken)
+
+  // Fit the book to the viewport: near-fullscreen at every aspect ratio.
+  useEffect(() => {
+    const halfFovTan = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))
+    const aspect = size.width / size.height
+    const zForH = FIT_HALF_H / halfFovTan
+    const zForW = FIT_HALF_W / (halfFovTan * aspect)
+    const fit = THREE.MathUtils.clamp(Math.max(zForH, zForW) * 1.04, CAMERA_MIN_Z, CAMERA_MAX_Z)
+    zoom.current.fit = fit
+    zoom.current.target = fit
+  }, [camera, size])
 
   useEffect(() => {
     if (resetToken === 0) return
-    gsap.to(zoom.current, { target: CAMERA_DEFAULT_Z, duration: 0.9, ease: 'power3.out' })
+    gsap.to(zoom.current, { target: zoom.current.fit, duration: 0.9, ease: 'power3.out' })
   }, [resetToken])
+
+  // gentle push-in while a page turns or the cover opens
+  useEffect(() => {
+    const unsub = useBookStore.subscribe((s, prev) => {
+      if ((s.turning && !prev.turning) || (s.opening && !prev.opening)) {
+        gsap.killTweensOf(zoom.current, 'push')
+        gsap.to(zoom.current, { push: -0.12, duration: 0.45, ease: 'power2.out' })
+      } else if ((!s.turning && prev.turning) || (!s.opening && prev.opening)) {
+        gsap.to(zoom.current, { push: 0, duration: 0.8, ease: 'power2.inOut' })
+      }
+    })
+    return unsub
+  }, [])
 
   useEffect(() => {
     const el = gl.domElement
@@ -47,6 +75,10 @@ export default function Controls() {
     }
 
     const move = (e) => {
+      // parallax sway target (normalized pointer)
+      sway.current.x = (e.clientX / window.innerWidth) * 2 - 1
+      sway.current.y = (e.clientY / window.innerHeight) * 2 - 1
+
       const p = pointers.get(e.pointerId)
       if (p) {
         p.x = e.clientX
@@ -125,7 +157,13 @@ export default function Controls() {
   }, [gl])
 
   useFrame((_, dt) => {
-    camera.position.z += (zoom.current.target - camera.position.z) * Math.min(1, dt * 6)
+    const k = Math.min(1, dt * 5)
+    const z = zoom.current.target + zoom.current.push
+    camera.position.z += (z - camera.position.z) * k
+    // subtle parallax — sitting at the desk, leaning slightly with the pointer
+    camera.position.x += (sway.current.x * 0.09 - camera.position.x) * k * 0.6
+    camera.position.y += (0.16 - sway.current.y * 0.06 - camera.position.y) * k * 0.6
+    camera.lookAt(0, -0.04, 0)
   })
 
   return null

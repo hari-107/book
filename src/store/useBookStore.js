@@ -27,6 +27,10 @@ export const useBookStore = create((set, get) => ({
   // Incremented to request a view reset (orientation + zoom)
   resetToken: 0,
 
+  // Incremented when the Fun Zone easter egg fires (background burst + book wobble)
+  eggToken: 0,
+  triggerEgg: () => set((s) => ({ eggToken: s.eggToken + 1 })),
+
   // Imperative animation API, registered by <Book/>
   api: null,
   registerApi: (api) => set({ api }),

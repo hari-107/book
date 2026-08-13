@@ -23,13 +23,15 @@ export function createSheetUniforms() {
     uCurl: { value: 0.5 },
     uCurlDir: { value: 1 },
     uWidth: { value: PAGE_W },
+    uTime: { value: 0 },
   }
 }
 
 const BEND_MATH = /* glsl */ `
   float bendD = clamp(position.x / uWidth, 0.0, 1.0);
   float bendProfile = 0.65 * pow(bendD, 1.7) + 0.35 * sin(bendD * PI);
-  float bendA = -(uBendAngle + uCurlDir * uCurl * sin(uBendAngle) * bendProfile);
+  float bendFlutter = 0.035 * sin(uTime * 21.0 + bendD * 8.0) * sin(uBendAngle) * bendD;
+  float bendA = -(uBendAngle + uCurlDir * (uCurl * sin(uBendAngle) * bendProfile + bendFlutter));
   float bendS = sin(bendA);
   float bendC = cos(bendA);
 `
@@ -47,6 +49,7 @@ export function createBendMaterial({ map, uniforms, backSide = false }) {
     shader.uniforms.uCurl = uniforms.uCurl
     shader.uniforms.uCurlDir = uniforms.uCurlDir
     shader.uniforms.uWidth = uniforms.uWidth
+    shader.uniforms.uTime = uniforms.uTime
 
     shader.vertexShader =
       `
@@ -54,6 +57,7 @@ export function createBendMaterial({ map, uniforms, backSide = false }) {
       uniform float uCurl;
       uniform float uCurlDir;
       uniform float uWidth;
+      uniform float uTime;
       ` + shader.vertexShader
 
     shader.vertexShader = shader.vertexShader.replace(

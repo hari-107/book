@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useBookStore } from '../store/useBookStore.js'
-import { bookMeta } from '../data/bookContent.js'
 
 /**
- * Polished loading veil. Geometry, fonts and image assets are prepared behind
- * it; nothing partially loaded is ever exposed. Fades into the closed-book
- * presentation once everything is ready.
+ * Loading veil — an old label in the dark while the book is dusted off.
+ * Geometry, fonts and image assets are prepared behind it; nothing partially
+ * loaded is ever exposed. Fades into the closed-book presentation when ready.
  */
 export default function LoadingScreen() {
   const phase = useBookStore((s) => s.phase)
@@ -22,8 +21,8 @@ export default function LoadingScreen() {
 
   return (
     <div className={`loading${phase === 'ready' ? ' loading--done' : ''}`}>
-      <div className="loading__emblem">{bookMeta.monogram}</div>
-      <div className="loading__title">Binding the book</div>
+      <div className="loading__emblem">✦</div>
+      <div className="loading__title">dusting off an old book…</div>
       <div className="loading__bar">
         <span />
       </div>

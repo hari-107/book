@@ -13,8 +13,8 @@ import { inRect } from './Page.jsx'
  * Visually it is part of the object: aged paper, gilt border, book serifs.
  */
 
-const CW = 900
-const CH = 1180
+const CW = 1240
+const CH = 1000
 
 function buildNavTexture() {
   const c = document.createElement('canvas')
@@ -42,53 +42,69 @@ function buildNavTexture() {
   ctx.strokeRect(40, 40, CW - 80, CH - 80)
 
   ctx.fillStyle = INK
-  ctx.font = '600 54px "Playfair Display", serif'
+  ctx.font = '50px "Rye", "IM Fell English SC", serif'
   ctx.textAlign = 'center'
-  ctx.fillText('Navigation', CW / 2, 122)
+  ctx.fillText('MAP OF THE BOOK', CW / 2, 122)
   ctx.strokeStyle = GOLD
   ctx.lineWidth = 2
   ctx.beginPath()
-  ctx.moveTo(CW / 2 - 110, 150)
-  ctx.lineTo(CW / 2 + 110, 150)
+  ctx.moveTo(CW / 2 - 150, 150)
+  ctx.lineTo(CW / 2 + 150, 150)
   ctx.stroke()
 
-  ctx.font = 'italic 400 26px "EB Garamond", serif'
+  ctx.font = '600 30px "Caveat", cursive'
   ctx.fillStyle = INK_SOFT
-  ctx.fillText('Choose a page · every leaf of the book', CW / 2, 192)
+  ctx.fillText('every leaf of the book — pick one', CW / 2, 194)
 
-  let y = 268
-  const margin = 92
-  let lastSection = null
-  for (const item of NAV_ITEMS) {
+  // two columns — the book has many leaves
+  const margin = 86
+  const gap = 60
+  const colW = (CW - margin * 2 - gap) / 2
+  const rowH = 62
+  const topY = 262
+  const perCol = Math.ceil(NAV_ITEMS.length / 2)
+
+  NAV_ITEMS.forEach((item, i) => {
+    const col = Math.floor(i / perCol)
+    const x0 = margin + col * (colW + gap)
+    const y = topY + (i % perCol) * rowH
     const indent = item.sectionTitle && !item.isSectionStart
-    if (item.sectionTitle && item.sectionTitle !== lastSection) lastSection = item.sectionTitle
-    const rowTop = y - 34
+    const rowTop = y - 32
 
     ctx.textAlign = 'left'
     if (indent) {
       ctx.fillStyle = INK_SOFT
-      ctx.font = 'italic 400 30px "EB Garamond", serif'
-      ctx.fillText(`— ${item.label}`, margin + 44, y)
+      ctx.font = '600 28px "Caveat", cursive'
+      ctx.fillText(`↳ ${item.label}`, x0 + 36, y)
     } else {
       ctx.fillStyle = INK
-      ctx.font = item.sectionTitle ? '500 34px "EB Garamond", serif' : 'italic 500 32px "EB Garamond", serif'
-      ctx.fillText(item.label, margin, y)
+      ctx.font = item.sectionTitle ? '24px "Special Elite", monospace' : '600 30px "Caveat", cursive'
+      ctx.fillText(item.sectionTitle ? item.label.toUpperCase() : item.label, x0, y)
     }
 
     ctx.textAlign = 'right'
     ctx.fillStyle = INK_SOFT
-    ctx.font = '400 30px "EB Garamond", serif'
-    ctx.fillText(String(item.pageNumber), CW - margin, y)
+    ctx.font = '23px "Special Elite", monospace'
+    ctx.fillText(String(item.pageNumber).padStart(2, '0'), x0 + colW, y)
 
     regions.push({
-      u0: (margin - 24) / CW,
-      v0: 1 - (y + 16) / CH,
-      u1: (CW - margin + 24) / CW,
+      u0: (x0 - 18) / CW,
+      v0: 1 - (y + 14) / CH,
+      u1: (x0 + colW + 18) / CW,
       v1: 1 - rowTop / CH,
       faceIndex: item.faceIndex,
     })
-    y += 64
-  }
+  })
+
+  // column divider
+  ctx.strokeStyle = 'rgba(110,86,56,0.4)'
+  ctx.lineWidth = 1.5
+  ctx.setLineDash([2, 6])
+  ctx.beginPath()
+  ctx.moveTo(CW / 2, topY - 34)
+  ctx.lineTo(CW / 2, topY + perCol * rowH - 20)
+  ctx.stroke()
+  ctx.setLineDash([])
 
   const texture = new THREE.CanvasTexture(c)
   texture.colorSpace = THREE.SRGBColorSpace
