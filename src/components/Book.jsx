@@ -1,0 +1,368 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useFrame } from '@react-three/fiber'
+import * as THREE from 'three'
+import { gsap } from 'gsap'
+import { COVER_W, EDGE_ZONE, SHEET_T } from '../constants.js'
+import { FACES, SHEET_COUNT, spreadForFace } from '../data/compileBook.js'
+import { renderPageFace, renderEndpaper } from '../three/pageTexture.js'
+import {
+  leatherColorTexture,
+  grainNormalTexture,
+  disposeAllProceduralTextures,
+} from '../three/proceduralTextures.js'
+import { createSheetUniforms } from '../three/bendMaterial.js'
+import { useBookStore } from '../store/useBookStore.js'
+import { FrontCover, BackCover } from './Cover.jsx'
+import Spine from './Spine.jsx'
+import PageBlock from './PageBlock.jsx'
+import StaticPageFace, { inRect } from './Page.jsx'
+import TurningPage from './TurningPage.jsx'
+import FloatingImages from './FloatingImages.jsx'
+import BookNavigation from './BookNavigation.jsx'
+import { useDoubleTap } from '../utils/doubleTap.js'
+
+const N = SHEET_COUNT
+const CLOSED_STACK_TOP = N * SHEET_T
+
+/**
+ * The book itself — the page's only element. Owns the physical model
+ * (covers, spine, stacks, static faces, turning sheet), every animation
+ * (opening, page turns, pick-up/put-down, view reset) and the double-click
+ * precedence: floating image → logo → index entry → edge zones → pick up.
+ */
+export default function Book() {
+  const dragRef = useRef()
+  const liftGroupRef = useRef()
+  const alignRef = useRef()
+  const coverPivotRef = useRef()
+  const sheetGroupRef = useRef()
+  const sheetMaterialsRef = useRef(null)
+  const leftFaceIdxRef = useRef(null)
+  const rightFaceIdxRef = useRef(null)
+
+  const openRef = useRef({ p: 0 })
+  const liftRef = useRef({ v: 0 })
+  const turnBusy = useRef(false)
+
+  const uniforms = useMemo(() => createSheetUniforms(), [])
+
+  const spread = useBookStore((s) => s.spread)
+  const held = useBookStore((s) => s.held)
+  const resetToken = useBookStore((s) => s.resetToken)
+  const registerApi = useBookStore((s) => s.registerApi)
+
+  const [turn, setTurn] = useState(null) // { sheet, dir } while a sheet is in flight
+
+  // ---- printed page faces ---------------------------------------------
+  const faceRender = useMemo(() => FACES.map((f, i) => renderPageFace(f, i % 2 === 0 ? 'right' : 'left')), [])
+  const mirrored = useMemo(
+    () =>
+      faceRender.map((fr, i) => {
+        if (i % 2 === 0) return null
+        const t = fr.texture.clone()
+        t.wrapS = THREE.RepeatWrapping
+        t.repeat.x = -1
+        t.offset.x = 1
+        t.needsUpdate = true
+        return t
+      }),
+    [faceRender]
+  )
+
+  const endpaperMat = useMemo(() => {
+    const { texture } = renderEndpaper('right')
+    return new THREE.MeshStandardMaterial({ map: texture, roughness: 0.9 })
+  }, [])
+
+  const leatherMat = useMemo(() => {
+    return new THREE.MeshStandardMaterial({
+      map: leatherColorTexture(),
+      normalMap: grainNormalTexture(),
+      normalScale: new THREE.Vector2(0.6, 0.6),
+      roughness: 0.52,
+      metalness: 0.12,
+    })
+  }, [])
+
+  useEffect(
+    () => () => {
+      faceRender.forEach((fr) => fr.texture.dispose())
+      mirrored.forEach((t) => t && t.dispose())
+      endpaperMat.map.dispose()
+      endpaperMat.dispose()
+      leatherMat.map.dispose()
+      leatherMat.normalMap.dispose()
+      leatherMat.dispose()
+      disposeAllProceduralTextures()
+    },
+    [faceRender, mirrored, endpaperMat, leatherMat]
+  )
+
+  // ---- visual state derived from spread + in-flight turn ----------------
+  const effLeft = turn ? (turn.dir > 0 ? spread : spread - 1) : spread
+  const effRight = turn ? (turn.dir > 0 ? N - spread - 1 : N - spread) : N - spread
+  let leftFaceIdx = turn && turn.dir < 0 ? 2 * spread - 3 : 2 * spread - 1
+  let rightFaceIdx = turn && turn.dir > 0 ? 2 * spread + 2 : 2 * spread
+  if (leftFaceIdx < 0) leftFaceIdx = null
+  if (rightFaceIdx > 2 * N - 1) rightFaceIdx = null
+  leftFaceIdxRef.current = leftFaceIdx
+  rightFaceIdxRef.current = rightFaceIdx
+
+  const visibleFaces = useMemo(() => {
+    const list = []
+    const l = 2 * spread - 1
+    const r = 2 * spread
+    if (l >= 0 && FACES[l]) list.push(FACES[l])
+    if (r <= 2 * N - 1 && FACES[r]) list.push(FACES[r])
+    return list
+  }, [spread])
+
+  // ---- animations -------------------------------------------------------
+  const openBook = useCallback(() => {
+    const s = useBookStore.getState()
+    if (s.isOpen || s.opening) return
+    s.setOpening(true)
+    gsap.to(openRef.current, {
+      p: 1,
+      duration: 1.9,
+      ease: 'power2.inOut',
+      onComplete: () => {
+        const st = useBookStore.getState()
+        st.setOpening(false)
+        st.setOpen(true)
+      },
+    })
+  }, [])
+
+  const doTurn = useCallback(
+    (dir, dur = 0.95, onDone) => {
+      const s = useBookStore.getState()
+      if (turnBusy.current || !s.isOpen || s.opening) return onDone && onDone(false)
+      const cur = s.spread
+      if ((dir > 0 && cur >= N) || (dir < 0 && cur <= 0)) return onDone && onDone(false)
+
+      const sheet = dir > 0 ? cur : cur - 1
+      turnBusy.current = true
+      s.setTurning(true)
+
+      const mats = sheetMaterialsRef.current
+      if (mats) {
+        mats.front.map = faceRender[2 * sheet].texture
+        mats.back.map = mirrored[2 * sheet + 1]
+      }
+      uniforms.uCurlDir.value = dir
+      uniforms.uBendAngle.value = dir > 0 ? 0 : Math.PI
+
+      const z0 = dir > 0 ? (N - cur) * SHEET_T : cur * SHEET_T
+      const z1 = dir > 0 ? (cur + 1) * SHEET_T : (N - cur + 1) * SHEET_T
+
+      setTurn({ sheet, dir })
+      const grp = sheetGroupRef.current
+      grp.position.z = z0
+      grp.visible = true
+
+      const proxy = { p: 0 }
+      gsap.to(proxy, {
+        p: 1,
+        duration: dur,
+        ease: 'power2.inOut',
+        onUpdate: () => {
+          uniforms.uBendAngle.value = dir > 0 ? proxy.p * Math.PI : (1 - proxy.p) * Math.PI
+          grp.position.z = z0 + (z1 - z0) * proxy.p
+        },
+        onComplete: () => {
+          const st = useBookStore.getState()
+          st.setSpread(cur + dir)
+          setTurn(null)
+          grp.visible = false
+          st.setTurning(false)
+          turnBusy.current = false
+          onDone && onDone(true)
+        },
+      })
+    },
+    [faceRender, mirrored, uniforms]
+  )
+
+  const jumpToFace = useCallback(
+    (f) => {
+      const target = spreadForFace(f)
+      const step = () => {
+        const cur = useBookStore.getState().spread
+        if (cur === target) return
+        const remaining = Math.abs(target - cur)
+        const dur = remaining > 1 ? Math.max(0.32, 0.72 - remaining * 0.05) : 0.85
+        doTurn(Math.sign(target - cur), dur, (ok) => ok && step())
+      }
+      step()
+    },
+    [doTurn]
+  )
+
+  useEffect(() => {
+    registerApi({
+      openBook,
+      next: () => {
+        const s = useBookStore.getState()
+        if (!s.isOpen) return openBook()
+        doTurn(1)
+      },
+      prev: () => doTurn(-1),
+      jumpToFace,
+      dragGroup: dragRef,
+    })
+  }, [registerApi, openBook, doTurn, jumpToFace])
+
+  // pick-up lift
+  useEffect(() => {
+    gsap.to(liftRef.current, { v: held ? 1 : 0, duration: 0.65, ease: 'power2.out' })
+  }, [held])
+
+  // reset-to-default orientation
+  useEffect(() => {
+    if (resetToken === 0) return
+    const g = dragRef.current
+    if (!g) return
+    const q0 = g.quaternion.clone()
+    const q1 = new THREE.Quaternion()
+    const proxy = { t: 0 }
+    gsap.to(proxy, {
+      t: 1,
+      duration: 0.9,
+      ease: 'power3.out',
+      onUpdate: () => g.quaternion.slerpQuaternions(q0, q1, proxy.t),
+    })
+  }, [resetToken])
+
+  // continuous transforms: opening, alignment, lift, idle breathing
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime()
+    const p = openRef.current.p
+    const cover = coverPivotRef.current
+    if (cover) {
+      cover.rotation.y = -Math.PI * p
+      cover.position.z = CLOSED_STACK_TOP * (1 - p) - 0.004 * p
+    }
+    if (alignRef.current) alignRef.current.position.x = (-COVER_W / 2) * (1 - p)
+    const lift = liftGroupRef.current
+    if (lift) {
+      const v = liftRef.current.v
+      lift.position.z = v * 0.3
+      lift.position.y = Math.sin(t * 0.9) * 0.016
+      const sc = 1 + v * 0.05
+      lift.scale.set(sc, sc, sc)
+    }
+  })
+
+  // ---- interaction handlers --------------------------------------------
+  const bodyDouble = useCallback(() => {
+    const s = useBookStore.getState()
+    if (!s.isOpen) return openBook()
+    if (s.navOpen) return s.setNavOpen(false)
+    if (s.focusedImage) return s.focusImage(null)
+    s.held ? s.putDown() : s.pickUp()
+  }, [openBook])
+  const bodyDoubleTap = useDoubleTap(bodyDouble)
+
+  const bodyClick = useCallback(() => {
+    const s = useBookStore.getState()
+    if (!s.isOpen && !s.opening) return openBook()
+    if (s.focusedImage) s.focusImage(null)
+  }, [openBook])
+
+  /**
+   * Double-click on a page face, resolved in spec priority order:
+   * logo stamp → index entry → edge zones → pick up / put down.
+   * (Floating images sit physically in front and stop propagation, so they
+   * naturally win the first slot.) Edge zones stay live while held.
+   */
+  const faceDouble = useCallback(
+    (e, side) => {
+      const s = useBookStore.getState()
+      if (!s.isOpen) return openBook()
+      if (s.navOpen) return s.setNavOpen(false)
+
+      const faceIdx = side === 'right' ? rightFaceIdxRef.current : leftFaceIdxRef.current
+      const regions = faceIdx == null ? [] : faceRender[faceIdx].regions
+      const uv = e.uv
+      if (uv) {
+        const logo = regions.find((r) => r.type === 'logo' && inRect(uv, r))
+        if (logo) return s.setNavOpen(true)
+        const idx = regions.find((r) => r.type === 'index' && inRect(uv, r))
+        if (idx) return jumpToFace(idx.faceIndex)
+        if (side === 'right' && uv.x > 1 - EDGE_ZONE) return doTurn(1)
+        if (side === 'left' && uv.x < EDGE_ZONE) return doTurn(-1)
+      }
+      if (s.focusedImage) return s.focusImage(null)
+      s.held ? s.putDown() : s.pickUp()
+    },
+    [faceRender, doTurn, jumpToFace, openBook]
+  )
+
+  const emblemActivate = useCallback(() => {
+    const s = useBookStore.getState()
+    if (!s.isOpen) return openBook()
+    s.setNavOpen(true)
+  }, [openBook])
+
+  const navZ = Math.max(effLeft, effRight) * SHEET_T + 0.72
+
+  return (
+    <group rotation={[-0.12, 0, 0]}>
+      <group ref={dragRef}>
+        <group ref={liftGroupRef}>
+          <group
+            ref={alignRef}
+            onClick={bodyClick}
+            onDoubleClick={bodyDouble}
+            onPointerUp={bodyDoubleTap}
+            onPointerOver={() => {
+              if (!useBookStore.getState().isOpen) document.body.style.cursor = 'pointer'
+            }}
+            onPointerOut={() => {
+              if (!useBookStore.getState().isOpen) document.body.style.cursor = 'auto'
+            }}
+          >
+            <BackCover leatherMat={leatherMat} endpaperMat={endpaperMat} />
+            <Spine openRef={openRef} leatherMat={leatherMat} />
+
+            <PageBlock side="right" sheets={effRight} />
+            <PageBlock side="left" sheets={effLeft} />
+
+            {leftFaceIdx != null && effLeft > 0 && (
+              <StaticPageFace
+                side="left"
+                texture={faceRender[leftFaceIdx].texture}
+                regions={faceRender[leftFaceIdx].regions}
+                z={effLeft * SHEET_T + 0.0025}
+                onDoubleActivate={faceDouble}
+              />
+            )}
+            {rightFaceIdx != null && effRight > 0 && (
+              <StaticPageFace
+                side="right"
+                texture={faceRender[rightFaceIdx].texture}
+                regions={faceRender[rightFaceIdx].regions}
+                z={effRight * SHEET_T + 0.0025}
+                onDoubleActivate={faceDouble}
+              />
+            )}
+
+            <TurningPage ref={sheetGroupRef} uniforms={uniforms} materialsRef={sheetMaterialsRef} />
+
+            <FrontCover
+              ref={coverPivotRef}
+              leatherMat={leatherMat}
+              endpaperMat={endpaperMat}
+              onEmblemActivate={emblemActivate}
+              onBodyClick={bodyClick}
+            />
+
+            <FloatingImages visibleFaces={visibleFaces} />
+            <BookNavigation z={navZ} />
+          </group>
+        </group>
+      </group>
+    </group>
+  )
+}
