@@ -164,7 +164,7 @@ export function grainNormalTexture(size = 256, strength = 1.8) {
 export function paperColorTexture(size = 256) {
   const c = makeCanvas(size, size)
   const ctx = c.getContext('2d')
-  ctx.fillStyle = '#dcc492'
+  ctx.fillStyle = '#e0d4b4'
   ctx.fillRect(0, 0, size, size)
   const img = ctx.getImageData(0, 0, size, size)
   const d = img.data
@@ -185,12 +185,13 @@ export function paperColorTexture(size = 256) {
 export function pageEdgeTexture(w = 64, h = 256) {
   const c = makeCanvas(w, h)
   const ctx = c.getContext('2d')
-  ctx.fillStyle = '#d3b578'
+  ctx.fillStyle = '#d9c69c'
   ctx.fillRect(0, 0, w, h)
   for (let y = 0; y < h; y += 2) {
-    const a = 0.06 + Math.random() * 0.26
+    const a = 0.06 + Math.random() * 0.28
     const inset = Math.random() * 5
-    ctx.fillStyle = `rgba(95,70,35,${a.toFixed(3)})`
+    const cream = Math.random() > 0.72
+    ctx.fillStyle = cream ? `rgba(240,230,204,${(a * 0.9).toFixed(3)})` : `rgba(95,70,35,${a.toFixed(3)})`
     ctx.fillRect(inset, y, w - inset * (0.5 + Math.random()), 1 + (Math.random() > 0.85 ? 1 : 0))
   }
   // age spots / water stains

@@ -87,26 +87,78 @@ function wobblyCircle(ctx, cx, cy, r, rnd, wobble = 2) {
 }
 
 // ---- parchment --------------------------------------------------------------
+/**
+ * Cloudy multi-octave mottling: a tiny canvas of sparse warm-brown pixels,
+ * bilinearly upscaled over the page. Layered at several scales it produces
+ * the soft watermark clouds of genuinely old paper.
+ */
+function cloudLayer(ctx, rnd, cellsX, cellsY, maxAlpha, tone = [150, 118, 66]) {
+  const tiny = document.createElement('canvas')
+  tiny.width = cellsX
+  tiny.height = cellsY
+  const tctx = tiny.getContext('2d')
+  const img = tctx.createImageData(cellsX, cellsY)
+  for (let i = 0; i < cellsX * cellsY; i++) {
+    const a = Math.pow(rnd(), 2.6) * maxAlpha * 255
+    img.data[i * 4] = tone[0]
+    img.data[i * 4 + 1] = tone[1]
+    img.data[i * 4 + 2] = tone[2]
+    img.data[i * 4 + 3] = a
+  }
+  tctx.putImageData(img, 0, 0)
+  ctx.save()
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(tiny, 0, 0, W, H)
+  ctx.restore()
+}
+
 function paintParchment(ctx, side, rnd) {
-  // base — pale field-journal tan (reference tone), unevenly lit
-  const grad = ctx.createRadialGradient(W * (0.4 + rnd() * 0.2), H * (0.35 + rnd() * 0.2), H * 0.18, W / 2, H / 2, H * 0.78)
-  grad.addColorStop(0, '#e9dfc2')
-  grad.addColorStop(0.6, '#dccda4')
-  grad.addColorStop(1, '#b3985f')
+  // base — pale aged ivory (reference photo tone): near-cream center,
+  // aging lives in the clouds, creases and edges, not a uniform yellow.
+  const grad = ctx.createRadialGradient(W * (0.42 + rnd() * 0.16), H * (0.35 + rnd() * 0.2), H * 0.2, W / 2, H / 2, H * 0.8)
+  grad.addColorStop(0, '#e9e3d2')
+  grad.addColorStop(0.55, '#e0d7bf')
+  grad.addColorStop(1, '#c8b78e')
   ctx.fillStyle = grad
   ctx.fillRect(0, 0, W, H)
 
-  // uneven blotches of age
-  for (let i = 0; i < 12; i++) {
-    const x = rnd() * W
-    const y = rnd() * H
-    const r = 40 + rnd() * 160
-    const g = ctx.createRadialGradient(x, y, 2, x, y, r)
-    const dark = rnd() > 0.5
-    g.addColorStop(0, dark ? `rgba(120,85,35,${0.04 + rnd() * 0.08})` : `rgba(245,230,190,${0.05 + rnd() * 0.07})`)
-    g.addColorStop(1, 'rgba(0,0,0,0)')
-    ctx.fillStyle = g
-    ctx.fillRect(0, 0, W, H)
+  // cloudy age mottling at three scales
+  cloudLayer(ctx, rnd, 6, 8, 0.26)
+  cloudLayer(ctx, rnd, 14, 18, 0.18)
+  cloudLayer(ctx, rnd, 42, 55, 0.1)
+  // pale "cleaner" patches breaking the clouds up
+  cloudLayer(ctx, rnd, 9, 12, 0.2, [244, 238, 222])
+
+  // one or two big distinct stain regions (like the reference's tan cloud)
+  const stainCount = 1 + (rnd() > 0.55 ? 1 : 0)
+  for (let s = 0; s < stainCount; s++) {
+    const cx = rnd() > 0.5 ? W * (0.6 + rnd() * 0.35) : W * (0.05 + rnd() * 0.3)
+    const cy = H * (0.05 + rnd() * 0.5)
+    for (let i = 0; i < 7; i++) {
+      const x = cx + (rnd() - 0.5) * 220
+      const y = cy + (rnd() - 0.5) * 260
+      const r = 70 + rnd() * 150
+      const g = ctx.createRadialGradient(x, y, r * 0.15, x, y, r)
+      g.addColorStop(0, `rgba(146,112,60,${(0.05 + rnd() * 0.09).toFixed(3)})`)
+      g.addColorStop(1, 'rgba(146,112,60,0)')
+      ctx.fillStyle = g
+      ctx.fillRect(0, 0, W, H)
+    }
+    // tide line around part of the stain — the sharp dried edge of an old wet patch
+    ctx.strokeStyle = `rgba(122,90,44,${(0.14 + rnd() * 0.1).toFixed(3)})`
+    ctx.lineWidth = 2.4
+    ctx.beginPath()
+    const rr = 140 + rnd() * 90
+    const a0 = rnd() * Math.PI * 2
+    for (let i = 0; i <= 26; i++) {
+      const a = a0 + (i / 26) * Math.PI * (1.1 + rnd() * 0.6)
+      const r = rr * (0.82 + rnd() * 0.36)
+      const px = cx + Math.cos(a) * r
+      const py = cy + Math.sin(a) * r * 0.8
+      i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)
+    }
+    ctx.stroke()
   }
 
   // paper fibers
@@ -132,69 +184,185 @@ function paintParchment(ctx, side, rnd) {
     wobblyLine(ctx, x, y, x + (rnd() - 0.5) * 260, y + (rnd() - 0.5) * 180, rnd, 3, 5)
   }
 
-  // wrinkles — long soft curves
-  for (let i = 0; i < 4; i++) {
-    const x0 = rnd() * W
-    const y0 = rnd() * H
-    ctx.strokeStyle = 'rgba(90,65,30,0.09)'
+  // ---- crumple-crease network — the dominant texture of old handled paper.
+  // Long, slightly curved creases crossing the page: a pale cracked ridge
+  // with a soft shadow along one side, occasionally branching.
+  const creasePath = (x0, y0, x1, y1) => {
+    const pts = [[x0, y0]]
+    const segs = 4 + Math.floor(rnd() * 3)
+    for (let i = 1; i < segs; i++) {
+      const t = i / segs
+      pts.push([
+        x0 + (x1 - x0) * t + (rnd() - 0.5) * 90,
+        y0 + (y1 - y0) * t + (rnd() - 0.5) * 90,
+      ])
+    }
+    pts.push([x1, y1])
+    return pts
+  }
+  const strokeCrease = (pts, strength) => {
+    // perpendicular-ish shadow offset
+    const dx = pts[pts.length - 1][0] - pts[0][0]
+    const dy = pts[pts.length - 1][1] - pts[0][1]
+    const len = Math.hypot(dx, dy) || 1
+    const ox = (-dy / len) * 4.5
+    const oy = (dx / len) * 4.5
+    // broad soft shadow side (the flattened crumple valley)
+    ctx.strokeStyle = `rgba(104,82,48,${(0.09 * strength).toFixed(3)})`
+    ctx.lineWidth = 20
+    ctx.beginPath()
+    pts.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x + ox * 1.6, y + oy * 1.6) : ctx.lineTo(x + ox * 1.6, y + oy * 1.6)))
+    ctx.stroke()
+    ctx.strokeStyle = `rgba(104,82,48,${(0.14 * strength).toFixed(3)})`
+    ctx.lineWidth = 9
+    ctx.beginPath()
+    pts.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x + ox, y + oy) : ctx.lineTo(x + ox, y + oy)))
+    ctx.stroke()
+    ctx.strokeStyle = `rgba(96,74,42,${(0.2 * strength).toFixed(3)})`
+    ctx.lineWidth = 3.6
+    ctx.stroke()
+    // pale cracked ridge catching the light
+    ctx.strokeStyle = `rgba(252,248,238,${(0.55 * strength).toFixed(3)})`
     ctx.lineWidth = 2.2
     ctx.beginPath()
-    ctx.moveTo(x0, y0)
-    ctx.quadraticCurveTo(x0 + (rnd() - 0.5) * 500, y0 + (rnd() - 0.5) * 500, x0 + (rnd() - 0.5) * 800, y0 + (rnd() - 0.5) * 700)
+    pts.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)))
     ctx.stroke()
-    ctx.strokeStyle = 'rgba(250,240,210,0.08)'
-    ctx.lineWidth = 1.2
-    ctx.beginPath()
-    ctx.moveTo(x0 + 2, y0 + 2)
-    ctx.quadraticCurveTo(x0 + (rnd() - 0.5) * 500, y0 + (rnd() - 0.5) * 500, x0 + (rnd() - 0.5) * 800, y0 + (rnd() - 0.5) * 700)
+    ctx.strokeStyle = `rgba(255,252,244,${(0.3 * strength).toFixed(3)})`
+    ctx.lineWidth = 1
     ctx.stroke()
   }
-
-  // hard fold creases — a light ridge with a shadow valley beside it
-  const creaseCount = 1 + Math.floor(rnd() * 2)
-  for (let i = 0; i < creaseCount; i++) {
-    const vertical = rnd() > 0.5
-    const p = 0.25 + rnd() * 0.5
-    ctx.lineWidth = 2
-    if (vertical) {
-      const x = p * W
-      ctx.strokeStyle = 'rgba(255,248,225,0.16)'
-      ctx.beginPath()
-      ctx.moveTo(x, H * 0.08)
-      ctx.lineTo(x + (rnd() - 0.5) * 30, H * 0.92)
-      ctx.stroke()
-      ctx.strokeStyle = 'rgba(70,48,20,0.16)'
-      ctx.beginPath()
-      ctx.moveTo(x + 3, H * 0.08)
-      ctx.lineTo(x + 3 + (rnd() - 0.5) * 30, H * 0.92)
-      ctx.stroke()
-    } else {
-      const y = p * H
-      ctx.strokeStyle = 'rgba(255,248,225,0.16)'
-      ctx.beginPath()
-      ctx.moveTo(W * 0.08, y)
-      ctx.lineTo(W * 0.92, y + (rnd() - 0.5) * 30)
-      ctx.stroke()
-      ctx.strokeStyle = 'rgba(70,48,20,0.16)'
-      ctx.beginPath()
-      ctx.moveTo(W * 0.08, y + 3)
-      ctx.lineTo(W * 0.92, y + 3 + (rnd() - 0.5) * 30)
-      ctx.stroke()
-    }
-  }
-
-  // burnt, darkened borders
-  const edge = (x0, y0, x1, y1) => {
-    const g = ctx.createLinearGradient(x0, y0, x1, y1)
-    g.addColorStop(0, `rgba(70,45,15,${0.32 + rnd() * 0.14})`)
-    g.addColorStop(1, 'rgba(70,45,15,0)')
+  // broad crumple facets — big soft tonal planes left by old crumpling
+  for (let i = 0; i < 5; i++) {
+    const ang = rnd() * Math.PI
+    const cxx = rnd() * W
+    const cyy = rnd() * H
+    const span = 260 + rnd() * 320
+    const g = ctx.createLinearGradient(
+      cxx - Math.cos(ang) * span, cyy - Math.sin(ang) * span,
+      cxx + Math.cos(ang) * span, cyy + Math.sin(ang) * span
+    )
+    const dark = rnd() > 0.5
+    g.addColorStop(0, 'rgba(0,0,0,0)')
+    g.addColorStop(0.5, dark ? `rgba(110,88,52,${(0.05 + rnd() * 0.05).toFixed(3)})` : `rgba(248,242,228,${(0.06 + rnd() * 0.06).toFixed(3)})`)
+    g.addColorStop(1, 'rgba(0,0,0,0)')
     ctx.fillStyle = g
     ctx.fillRect(0, 0, W, H)
   }
-  edge(0, 0, W * 0.09, 0)
-  edge(W, 0, W * 0.91, 0)
-  edge(0, 0, 0, H * 0.07)
-  edge(0, H, 0, H * 0.93)
+  const edgePoint = () => {
+    const e = Math.floor(rnd() * 4)
+    if (e === 0) return [rnd() * W, -10]
+    if (e === 1) return [rnd() * W, H + 10]
+    if (e === 2) return [-10, rnd() * H]
+    return [W + 10, rnd() * H]
+  }
+  const creaseCount = 9 + Math.floor(rnd() * 5)
+  for (let i = 0; i < creaseCount; i++) {
+    const [x0, y0] = edgePoint()
+    const long = rnd() > 0.35
+    const x1 = long ? edgePoint()[0] : W * (0.2 + rnd() * 0.6)
+    const y1 = long ? edgePoint()[1] : H * (0.2 + rnd() * 0.6)
+    const pts = creasePath(x0, y0, x1, y1)
+    const strength = 0.55 + rnd() * 0.45
+    strokeCrease(pts, strength)
+    // branch from a midpoint
+    if (rnd() > 0.55) {
+      const [bx, by] = pts[Math.floor(pts.length / 2)]
+      strokeCrease(creasePath(bx, by, bx + (rnd() - 0.5) * 500, by + (rnd() - 0.5) * 420), strength * 0.7)
+    }
+  }
+  // a couple of sharp hairline cracks
+  for (let i = 0; i < 2; i++) {
+    const [x0, y0] = edgePoint()
+    const pts = creasePath(x0, y0, W * (0.25 + rnd() * 0.5), H * (0.25 + rnd() * 0.5))
+    ctx.strokeStyle = 'rgba(255,252,244,0.5)'
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    pts.forEach(([x, y], j) => (j === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)))
+    ctx.stroke()
+    ctx.strokeStyle = 'rgba(95,75,45,0.22)'
+    ctx.beginPath()
+    pts.forEach(([x, y], j) => (j === 0 ? ctx.moveTo(x + 1.4, y + 1.4) : ctx.lineTo(x + 1.4, y + 1.4)))
+    ctx.stroke()
+  }
+
+  // foxing — the rust-brown speckle of damp-aged paper
+  const speckCount = 26 + Math.floor(rnd() * 30)
+  for (let i = 0; i < speckCount; i++) {
+    const x = rnd() * W
+    const y = rnd() * H
+    const r = 0.7 + rnd() * (rnd() > 0.85 ? 5 : 1.8)
+    ctx.fillStyle = `rgba(${105 + Math.floor(rnd() * 40)},${64 + Math.floor(rnd() * 26)},28,${(0.12 + rnd() * 0.3).toFixed(3)})`
+    ctx.beginPath()
+    ctx.arc(x, y, r, 0, Math.PI * 2)
+    ctx.fill()
+  }
+  // a few blooming foxing spots
+  for (let i = 0; i < 4; i++) {
+    if (rnd() < 0.4) continue
+    const x = rnd() * W
+    const y = rnd() * H
+    const r = 6 + rnd() * 14
+    const g = ctx.createRadialGradient(x, y, 0.5, x, y, r)
+    g.addColorStop(0, 'rgba(120,72,28,0.4)')
+    g.addColorStop(0.5, 'rgba(140,95,40,0.18)')
+    g.addColorStop(1, 'rgba(140,95,40,0)')
+    ctx.fillStyle = g
+    ctx.beginPath()
+    ctx.arc(x, y, r, 0, Math.PI * 2)
+    ctx.fill()
+  }
+
+  // deep browned borders — layered gradient plus irregular grime blotches
+  const edge = (x0, y0, x1, y1, a) => {
+    const g = ctx.createLinearGradient(x0, y0, x1, y1)
+    g.addColorStop(0, `rgba(96,64,26,${a})`)
+    g.addColorStop(0.5, `rgba(110,78,36,${a * 0.4})`)
+    g.addColorStop(1, 'rgba(110,78,36,0)')
+    ctx.fillStyle = g
+    ctx.fillRect(0, 0, W, H)
+  }
+  edge(0, 0, W * 0.1, 0, 0.4 + rnd() * 0.15)
+  edge(W, 0, W * 0.88, 0, 0.42 + rnd() * 0.15)
+  edge(0, 0, 0, H * 0.09, 0.38 + rnd() * 0.12)
+  edge(0, H, 0, H * 0.9, 0.4 + rnd() * 0.12)
+  // grime blotches hugging the borders (uneven, hand-worn)
+  for (let i = 0; i < 26; i++) {
+    const along = rnd()
+    const e = Math.floor(rnd() * 4)
+    let x, y
+    if (e === 0) (x = along * W), (y = rnd() * H * 0.045)
+    else if (e === 1) (x = along * W), (y = H - rnd() * H * 0.045)
+    else if (e === 2) (x = rnd() * W * 0.05), (y = along * H)
+    else (x = W - rnd() * W * 0.05), (y = along * H)
+    const r = 14 + rnd() * 46
+    const g = ctx.createRadialGradient(x, y, 1, x, y, r)
+    g.addColorStop(0, `rgba(84,54,20,${(0.1 + rnd() * 0.16).toFixed(3)})`)
+    g.addColorStop(1, 'rgba(84,54,20,0)')
+    ctx.fillStyle = g
+    ctx.fillRect(0, 0, W, H)
+  }
+  // darker corners
+  for (const [cx, cy] of [[0, 0], [W, 0], [0, H], [W, H]]) {
+    const g = ctx.createRadialGradient(cx, cy, 4, cx, cy, 150 + rnd() * 80)
+    g.addColorStop(0, `rgba(78,50,20,${(0.3 + rnd() * 0.15).toFixed(3)})`)
+    g.addColorStop(1, 'rgba(78,50,20,0)')
+    ctx.fillStyle = g
+    ctx.fillRect(0, 0, W, H)
+  }
+  // ragged rims of the sheets layered beneath, peeking past the fore-edge
+  const foreX = side === 'right' ? W : 0
+  const rimDir = side === 'right' ? -1 : 1
+  for (let layer = 0; layer < 3; layer++) {
+    const inset = 4 + layer * 5
+    ctx.strokeStyle = layer % 2 === 0 ? 'rgba(214,190,140,0.5)' : 'rgba(120,88,44,0.4)'
+    ctx.lineWidth = 2.2
+    ctx.beginPath()
+    for (let yy = H * 0.03; yy < H * 0.97; yy += 26) {
+      const x = foreX + rimDir * (inset + Math.sin(yy * 0.05 + layer * 3 + rnd() * 0.4) * 3 + rnd() * 2)
+      yy < H * 0.04 ? ctx.moveTo(x, yy) : ctx.lineTo(x, yy)
+    }
+    ctx.stroke()
+  }
 
   // torn / worn corners
   const corners = [
@@ -216,11 +384,12 @@ function paintParchment(ctx, side, rnd) {
     ctx.fill()
   })
 
-  // gutter shadow on the spine side
-  const gw = W * 0.09
+  // gutter shadow on the spine side — deep and warm, like the reference fold
+  const gw = W * 0.115
   const g = side === 'right' ? ctx.createLinearGradient(0, 0, gw, 0) : ctx.createLinearGradient(W, 0, W - gw, 0)
-  g.addColorStop(0, 'rgba(55,35,12,0.42)')
-  g.addColorStop(1, 'rgba(55,35,12,0)')
+  g.addColorStop(0, 'rgba(48,30,10,0.55)')
+  g.addColorStop(0.45, 'rgba(80,54,22,0.24)')
+  g.addColorStop(1, 'rgba(80,54,22,0)')
   ctx.fillStyle = g
   ctx.fillRect(side === 'right' ? 0 : W - gw, 0, gw, H)
 }
