@@ -17,11 +17,14 @@ export const PAGE_TEX_H = 1340
 // Camera — close, like sitting at a desk in front of the book.
 // (Controls recomputes the actual fit per viewport aspect.)
 export const CAMERA_FOV = 42
-export const CAMERA_DEFAULT_Z = 2.55
-export const CAMERA_MIN_Z = 1.85
+export const CAMERA_DEFAULT_Z = 2.5
+export const CAMERA_MIN_Z = 1.8
 export const CAMERA_MAX_Z = 4.8
-export const FIT_HALF_W = 1.52 // half-width the camera must keep in frame
-export const FIT_HALF_H = 1.02 // half-height the camera must keep in frame
+export const FIT_HALF_W = 1.47 // half-width the camera must keep in frame
+export const FIT_HALF_H = 0.99 // half-height the camera must keep in frame
+
+// The desk surface sits just under the book's bottom edge
+export const DESK_Y = -0.9
 
 // Ink & material palette — aged adventure journal
 export const INK = '#332615' // faded dark-brown ink

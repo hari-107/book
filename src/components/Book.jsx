@@ -8,9 +8,12 @@ import { renderPageFace, renderEndpaper } from '../three/pageTexture.js'
 import {
   leatherColorTexture,
   grainNormalTexture,
+  shadowBlobTexture,
   disposeAllProceduralTextures,
 } from '../three/proceduralTextures.js'
 import { createSheetUniforms } from '../three/bendMaterial.js'
+import { buildSheetGeometries, disposeSheetGeometries } from '../three/sheetGeometry.js'
+import PageEphemera from './PageEphemera.jsx'
 import { useBookStore } from '../store/useBookStore.js'
 import { FrontCover, BackCover } from './Cover.jsx'
 import Spine from './Spine.jsx'
@@ -47,8 +50,13 @@ export default function Book() {
   const openRef = useRef({ p: 0 })
   const liftRef = useRef({ v: 0 })
   const turnBusy = useRef(false)
+  const turnStateRef = useRef(null)
 
   const uniforms = useMemo(() => createSheetUniforms(), [])
+  const sheetGeoms = useMemo(() => buildSheetGeometries(), [])
+  const turnShadowRef = useRef()
+  const turnShadowTex = useMemo(() => shadowBlobTexture(), [])
+  const hoverNudgeAt = useRef(0)
 
   const spread = useBookStore((s) => s.spread)
   const held = useBookStore((s) => s.held)
@@ -97,9 +105,10 @@ export default function Book() {
       leatherMat.map.dispose()
       leatherMat.normalMap.dispose()
       leatherMat.dispose()
+      disposeSheetGeometries(sheetGeoms)
       disposeAllProceduralTextures()
     },
-    [faceRender, mirrored, endpaperMat, leatherMat]
+    [faceRender, mirrored, endpaperMat, leatherMat, sheetGeoms]
   )
 
   // ---- visual state derived from spread + in-flight turn ----------------
@@ -113,6 +122,7 @@ export default function Book() {
   rightFaceIdxRef.current = rightFaceIdx
   effLeftRef.current = effLeft
   effRightRef.current = effRight
+  turnStateRef.current = turn
 
   const visibleFaces = useMemo(() => {
     const list = []
@@ -128,10 +138,11 @@ export default function Book() {
     const s = useBookStore.getState()
     if (s.isOpen || s.opening) return
     s.setOpening(true)
+    // heavy, mechanical — an old spine resisting, then giving way
     gsap.to(openRef.current, {
       p: 1,
-      duration: 1.9,
-      ease: 'power2.inOut',
+      duration: 2.3,
+      ease: 'power3.inOut',
       onComplete: () => {
         const st = useBookStore.getState()
         st.setOpening(false)
@@ -141,7 +152,7 @@ export default function Book() {
   }, [])
 
   const doTurn = useCallback(
-    (dir, dur = 0.95, onDone) => {
+    (dir, dur = 1.05, onDone) => {
       const s = useBookStore.getState()
       if (turnBusy.current || !s.isOpen || s.opening) return onDone && onDone(false)
       const cur = s.spread
@@ -255,7 +266,8 @@ export default function Book() {
     if (lift) {
       const v = liftRef.current.v
       lift.position.z = v * 0.3
-      lift.position.y = Math.sin(t * 0.9) * 0.016
+      // held books rise off the desk so free rotation clears it
+      lift.position.y = Math.sin(t * 0.9) * 0.016 + v * 0.42
       const sc = 1 + v * 0.05
       lift.scale.set(sc, sc, sc)
     }
@@ -265,6 +277,20 @@ export default function Book() {
       ribbon.visible = p > 0.6
       ribbon.position.z = Math.max(effLeftRef.current, effRightRef.current) * SHEET_T + 0.006
       ribbon.material.opacity = (p - 0.6) * 2.5
+    }
+    // moving shadow cast by the sheet in flight
+    const shadow = turnShadowRef.current
+    if (shadow) {
+      const A = uniforms.uBendAngle.value
+      const active = !!turnStateRef.current && A > 0.02 && A < Math.PI - 0.02
+      shadow.visible = active
+      if (active) {
+        const s = Math.sin(A)
+        shadow.position.x = Math.cos(A) * 0.5 * 1.3
+        shadow.position.z = Math.max(effLeftRef.current, effRightRef.current) * SHEET_T + 0.004
+        shadow.scale.set(Math.max(0.35, Math.abs(Math.cos(A))) * 1.5, 1.9, 1)
+        shadow.material.opacity = 0.34 * Math.pow(s, 1.4)
+      }
     }
   })
 
@@ -352,7 +378,16 @@ export default function Book() {
             onDoubleClick={bodyDouble}
             onPointerUp={bodyDoubleTap}
             onPointerOver={() => {
-              if (!useBookStore.getState().isOpen) document.body.style.cursor = 'pointer'
+              const s = useBookStore.getState()
+              if (!s.isOpen) {
+                document.body.style.cursor = 'pointer'
+                // the closed journal stirs when your hand approaches
+                const now = performance.now()
+                if (!s.opening && now - hoverNudgeAt.current > 900) {
+                  hoverNudgeAt.current = now
+                  nudge(0.35)
+                }
+              }
             }}
             onPointerOut={() => {
               if (!useBookStore.getState().isOpen) document.body.style.cursor = 'auto'
@@ -369,6 +404,7 @@ export default function Book() {
                 side="left"
                 texture={faceRender[leftFaceIdx].texture}
                 regions={faceRender[leftFaceIdx].regions}
+                geometry={sheetGeoms[Math.floor(leftFaceIdx / 2)].left}
                 z={effLeft * SHEET_T + 0.0025}
                 onDoubleActivate={faceDouble}
               />
@@ -378,12 +414,24 @@ export default function Book() {
                 side="right"
                 texture={faceRender[rightFaceIdx].texture}
                 regions={faceRender[rightFaceIdx].regions}
+                geometry={sheetGeoms[Math.floor(rightFaceIdx / 2)].front}
                 z={effRight * SHEET_T + 0.0025}
                 onDoubleActivate={faceDouble}
               />
             )}
 
-            <TurningPage ref={sheetGroupRef} uniforms={uniforms} materialsRef={sheetMaterialsRef} />
+            {/* shadow swept across the stack by the sheet in flight */}
+            <mesh ref={turnShadowRef} visible={false} raycast={() => null}>
+              <planeGeometry args={[1, 1]} />
+              <meshBasicMaterial map={turnShadowTex} transparent opacity={0} depthWrite={false} color="#1a0f04" />
+            </mesh>
+
+            <TurningPage
+              ref={sheetGroupRef}
+              uniforms={uniforms}
+              materialsRef={sheetMaterialsRef}
+              geometry={sheetGeoms[turn ? turn.sheet : 0].front}
+            />
 
             <FrontCover
               ref={coverPivotRef}
@@ -400,6 +448,7 @@ export default function Book() {
             </mesh>
 
             <FloatingImages visibleFaces={visibleFaces} />
+            <PageEphemera spread={spread} visibleFaces={visibleFaces} stackTopZ={Math.max(effLeft, effRight) * SHEET_T} />
             <BookNavigation z={navZ} />
           </group>
           </group>

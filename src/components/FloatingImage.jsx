@@ -4,7 +4,13 @@ import * as THREE from 'three'
 import { gsap } from 'gsap'
 import { useBookStore } from '../store/useBookStore.js'
 import { imageTextureCache } from '../three/imageCache.js'
-import { placeholderImageTexture, tapeTexture } from '../three/proceduralTextures.js'
+import {
+  placeholderImageTexture,
+  tapeTexture,
+  shadowBlobTexture,
+  photoCaptionTexture,
+} from '../three/proceduralTextures.js'
+import { GOLD } from '../constants.js'
 
 /**
  * One photograph, treated like a physical print somebody tossed onto the
@@ -19,7 +25,7 @@ import { placeholderImageTexture, tapeTexture } from '../three/proceduralTexture
 
 const ANCHORS = [
   [0.6, 0.42], [-0.55, 0.44], [0.7, -0.32], [-0.64, -0.36],
-  [0.18, 0.6], [-0.2, -0.62], [0.88, 0.06], [-0.88, 0.12],
+  [0.18, 0.6], [-0.2, -0.62], [1.22, 0.06], [-1.22, 0.14], // last two hang off the fore-edges
 ]
 
 function seededRand(seed) {
@@ -62,6 +68,13 @@ export default function FloatingImage({ img, slot, hidden, leaving, seed }) {
   const isReal = !!imageTextureCache.get(img.id)
 
   const tapeTex = useMemo(() => tapeTexture(), [])
+  const shadowTex = useMemo(() => shadowBlobTexture(), [])
+  const captionTex = useMemo(
+    () => (isReal ? photoCaptionTexture(img.caption || '…') : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [img.caption, isReal]
+  )
+  const usePin = seed % 3 === 0 // some prints are pinned, some taped
 
   const aspect = texture.image && texture.image.height ? texture.image.width / texture.image.height : 640 / 520
   const imgW = 0.52
@@ -72,8 +85,12 @@ export default function FloatingImage({ img, slot, hidden, leaving, seed }) {
       photo: new THREE.MeshBasicMaterial({ map: texture, transparent: true, opacity: 0, toneMapped: false }),
       frame: new THREE.MeshStandardMaterial({ color: '#efe4c8', roughness: 0.7, transparent: true, opacity: 0 }),
       tape: new THREE.MeshBasicMaterial({ map: tapeTex, transparent: true, opacity: 0, depthWrite: false }),
+      shadow: new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, opacity: 0, depthWrite: false }),
+      caption: captionTex
+        ? new THREE.MeshBasicMaterial({ map: captionTex, transparent: true, opacity: 0, depthWrite: false })
+        : null,
     }),
-    [texture, tapeTex]
+    [texture, tapeTex, shadowTex, captionTex]
   )
 
   const anim = useRef({ base: 0, vis: 0, hoverLift: 0 })
@@ -164,16 +181,22 @@ export default function FloatingImage({ img, slot, hidden, leaving, seed }) {
     materials.photo.opacity = o
     materials.frame.opacity = o * 0.96
     materials.tape.opacity = o * 0.9
+    materials.shadow.opacity = o * 0.5
+    if (materials.caption) materials.caption.opacity = o * 0.95
     g.visible = o > 0.02
   })
 
   return (
     <group ref={groupRef} visible={false}>
       <group ref={wobbleRef}>
+        {/* drop shadow cast onto the parchment below */}
+        <mesh material={materials.shadow} position={[0.02, -0.03, -0.02]} raycast={() => null}>
+          <planeGeometry args={[imgW * 1.45, imgH * 1.5]} />
+        </mesh>
         {/* aged polaroid backing for real photos (placeholders draw their own) */}
         {isReal && (
-          <mesh material={materials.frame} position={[0, -0.03, -0.004]}>
-            <planeGeometry args={[imgW + 0.06, imgH + 0.12]} />
+          <mesh material={materials.frame} position={[0, -0.035, -0.004]}>
+            <planeGeometry args={[imgW + 0.06, imgH + 0.14]} />
           </mesh>
         )}
         <mesh
@@ -192,13 +215,28 @@ export default function FloatingImage({ img, slot, hidden, leaving, seed }) {
         >
           <planeGeometry args={[imgW, imgH]} />
         </mesh>
-        {/* tape strips holding the print down */}
-        <mesh material={materials.tape} position={[-imgW / 2 + 0.02, imgH / 2 - 0.01, 0.003]} rotation={[0, 0, 0.7]} raycast={() => null}>
-          <planeGeometry args={[0.14, 0.05]} />
-        </mesh>
-        <mesh material={materials.tape} position={[imgW / 2 - 0.02, imgH / 2 - 0.01, 0.003]} rotation={[0, 0, -0.7]} raycast={() => null}>
-          <planeGeometry args={[0.14, 0.05]} />
-        </mesh>
+        {/* handwritten caption on the frame foot, reference-style */}
+        {materials.caption && (
+          <mesh material={materials.caption} position={[0, -imgH / 2 - 0.045, 0.002]} raycast={() => null}>
+            <planeGeometry args={[imgW * 0.92, 0.075]} />
+          </mesh>
+        )}
+        {/* fastening: some prints are pinned, others taped at two corners */}
+        {usePin ? (
+          <mesh position={[0, imgH / 2 - 0.015, 0.012]} raycast={() => null}>
+            <sphereGeometry args={[0.017, 12, 10]} />
+            <meshStandardMaterial color={GOLD} metalness={0.7} roughness={0.35} />
+          </mesh>
+        ) : (
+          <>
+            <mesh material={materials.tape} position={[-imgW / 2 + 0.02, imgH / 2 - 0.01, 0.003]} rotation={[0, 0, 0.7]} raycast={() => null}>
+              <planeGeometry args={[0.14, 0.05]} />
+            </mesh>
+            <mesh material={materials.tape} position={[imgW / 2 - 0.02, imgH / 2 - 0.01, 0.003]} rotation={[0, 0, -0.7]} raycast={() => null}>
+              <planeGeometry args={[0.14, 0.05]} />
+            </mesh>
+          </>
+        )}
       </group>
     </group>
   )

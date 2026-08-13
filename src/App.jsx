@@ -9,7 +9,7 @@ import FocusedPhoto from './components/FocusedPhoto.jsx'
 import { useBookStore } from './store/useBookStore.js'
 import { preloadImageTextures } from './three/imageCache.js'
 import { FACES } from './data/compileBook.js'
-import { CAMERA_DEFAULT_Z, CAMERA_FOV } from './constants.js'
+import { CAMERA_DEFAULT_Z, CAMERA_FOV, DESK_Y } from './constants.js'
 
 /**
  * One page. One enormous old adventure book, alive on a desk in the gloom.
@@ -77,7 +77,7 @@ export default function App() {
         <Controls />
 
         {/* grounded contact shadow beneath and around the book, on the desk */}
-        <ContactShadows position={[0, -1.35, 0]} opacity={0.72} scale={8} blur={2.4} far={3.4} resolution={512} color="#000000" />
+        <ContactShadows position={[0, DESK_Y + 0.004, 0]} opacity={0.7} scale={7} blur={2.2} far={2.4} resolution={512} color="#000000" />
       </Canvas>
       <LoadingScreen />
     </>

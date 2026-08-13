@@ -12,6 +12,16 @@ in-flight flutter), not a physics engine and not a CSS flip. All textures —
 worn leather, aged parchment, stains, doodles, stamps, gears, paper scraps —
 are generated procedurally at runtime; the repo ships zero binary assets.
 
+**The damage is real geometry.** Every sheet has deckled (irregular) edges,
+and designated sheets carry genuine corner tears and edge bites: the torn
+region is missing from the mesh silhouette itself (raycasts pass through it,
+the sheet below shows through), with a lifted fiber fringe and painted paper
+thickness along the rip — on the resting page AND while that same sheet
+turns. Photos, taped documents and the coin artifact float physically above
+the parchment and cast soft drop shadows onto it. The book rests on an
+explorer's desk: maps, letters, compass, magnifying glass, ink bottle,
+pencils, coins, and a candle whose light actually flickers.
+
 ---
 
 ## Run the project

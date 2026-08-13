@@ -15,10 +15,9 @@ export function inRect(uv, r) {
   return uv.x >= r.u0 && uv.x <= r.u1 && uv.y >= r.v0 && uv.y <= r.v1
 }
 
-export default function StaticPageFace({ side, texture, regions, z, onDoubleActivate }) {
+export default function StaticPageFace({ side, texture, regions, z, geometry, onDoubleActivate }) {
   const [edgeHover, setEdgeHover] = useState(false)
   const hintRef = useRef()
-  const x = side === 'right' ? PAGE_W / 2 : -PAGE_W / 2
 
   const material = useMemo(
     () => new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0 }),
@@ -62,16 +61,15 @@ export default function StaticPageFace({ side, texture, regions, z, onDoubleActi
 
   return (
     <group position={[0, 0, z]}>
+      {/* real damaged-paper silhouette — spine-anchored, torn corners missing from the mesh */}
       <mesh
-        position={[x, 0, 0]}
+        geometry={geometry}
         material={material}
         onDoubleClick={handleDouble}
         onPointerUp={tap}
         onPointerMove={handleMove}
         onPointerOut={handleOut}
-      >
-        <planeGeometry args={[PAGE_W, PAGE_H]} />
-      </mesh>
+      />
       {/* hover affordance: a soft warm sheen over the edge zone */}
       <mesh ref={hintRef} position={[hintX, 0, 0.0015]} visible={false} raycast={() => null}>
         <planeGeometry args={[hintW, PAGE_H]} />

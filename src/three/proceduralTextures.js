@@ -98,6 +98,20 @@ export function leatherColorTexture(size = 512) {
   ctx.setLineDash([9, 7])
   ctx.strokeRect(size * 0.045, size * 0.045, size * 0.91, size * 0.91)
   ctx.setLineDash([])
+  // fingerprints in the grime
+  for (let f = 0; f < 3; f++) {
+    const fx = size * (0.15 + Math.random() * 0.7)
+    const fy = size * (0.15 + Math.random() * 0.7)
+    ctx.strokeStyle = 'rgba(200,175,130,0.08)'
+    ctx.lineWidth = 1.6
+    for (let i = 0; i < 6; i++) {
+      const r = 4 + i * 3.4
+      const a0 = Math.random() * Math.PI * 2
+      ctx.beginPath()
+      ctx.ellipse(fx, fy, r, r * 0.7, 0.4, a0, a0 + Math.PI * 1.2)
+      ctx.stroke()
+    }
+  }
   // edge wear vignette (bleached rim, dark corners)
   const grad = ctx.createRadialGradient(size / 2, size / 2, size * 0.32, size / 2, size / 2, size * 0.74)
   grad.addColorStop(0, 'rgba(0,0,0,0)')
@@ -398,6 +412,252 @@ export function tapeTexture(w = 128, h = 48) {
     if (Math.random() > 0.5) ctx.clearRect(0, y, 5, 2)
     if (Math.random() > 0.5) ctx.clearRect(w - 5, y, 5, 2)
   }
+  const tex = new THREE.CanvasTexture(c)
+  tex.colorSpace = THREE.SRGBColorSpace
+  return track(tex)
+}
+
+/** Soft radial shadow blob — used under photos, scraps and artifacts. */
+export function shadowBlobTexture(size = 128) {
+  const c = makeCanvas(size, size)
+  const ctx = c.getContext('2d')
+  const g = ctx.createRadialGradient(size / 2, size / 2, size * 0.05, size / 2, size / 2, size * 0.5)
+  g.addColorStop(0, 'rgba(20,10,2,0.75)')
+  g.addColorStop(0.7, 'rgba(20,10,2,0.3)')
+  g.addColorStop(1, 'rgba(20,10,2,0)')
+  ctx.fillStyle = g
+  ctx.fillRect(0, 0, size, size)
+  const tex = new THREE.CanvasTexture(c)
+  return track(tex)
+}
+
+/** A torn old document with faux handwriting, stains and a burnt corner — taped onto pages. */
+export function scrapDocumentTexture(seed = 0, w = 300, h = 380) {
+  const c = makeCanvas(w, h)
+  const ctx = c.getContext('2d')
+  ctx.clearRect(0, 0, w, h)
+  // torn silhouette
+  ctx.fillStyle = '#e4d7b4'
+  ctx.beginPath()
+  ctx.moveTo(10, 14)
+  for (let x = 10; x < w - 10; x += 16) ctx.lineTo(x, 6 + Math.random() * 12)
+  for (let y = 14; y < h - 12; y += 18) ctx.lineTo(w - 6 - Math.random() * 12, y)
+  for (let x = w - 10; x > 10; x -= 16) ctx.lineTo(x, h - 6 - Math.random() * 12)
+  for (let y = h - 12; y > 14; y -= 18) ctx.lineTo(6 + Math.random() * 10, y)
+  ctx.closePath()
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(100,70,32,0.55)'
+  ctx.lineWidth = 2
+  ctx.stroke()
+  // stains
+  for (let i = 0; i < 4; i++) {
+    const g = ctx.createRadialGradient(Math.random() * w, Math.random() * h, 2, Math.random() * w, Math.random() * h, 26 + Math.random() * 50)
+    g.addColorStop(0, 'rgba(120,80,30,0.22)')
+    g.addColorStop(1, 'rgba(120,80,30,0)')
+    ctx.fillStyle = g
+    ctx.fillRect(0, 0, w, h)
+  }
+  // burnt corner
+  const bg = ctx.createRadialGradient(w - 16, 16, 2, w - 16, 16, 60)
+  bg.addColorStop(0, 'rgba(30,16,5,0.85)')
+  bg.addColorStop(0.6, 'rgba(80,45,15,0.4)')
+  bg.addColorStop(1, 'rgba(80,45,15,0)')
+  ctx.fillStyle = bg
+  ctx.fillRect(0, 0, w, h)
+  // faux handwriting — wavy ink lines (no real words, keeps it original)
+  ctx.strokeStyle = 'rgba(48,32,14,0.75)'
+  ctx.lineWidth = 1.8
+  for (let y = 56; y < h - 40; y += 26) {
+    ctx.beginPath()
+    let px = 26 + Math.random() * 10
+    ctx.moveTo(px, y)
+    const lineEnd = w - 30 - Math.random() * 40
+    while (px < lineEnd) {
+      const nx = px + 6 + Math.random() * 10
+      ctx.quadraticCurveTo(px + 3, y - 5 - Math.random() * 5, nx, y + (Math.random() - 0.5) * 4)
+      px = nx
+    }
+    ctx.stroke()
+  }
+  // signature flourish
+  ctx.beginPath()
+  ctx.moveTo(w * 0.5, h - 30)
+  ctx.bezierCurveTo(w * 0.6, h - 48, w * 0.72, h - 16, w * 0.85, h - 34)
+  ctx.stroke()
+  const tex = new THREE.CanvasTexture(c)
+  tex.colorSpace = THREE.SRGBColorSpace
+  return track(tex)
+}
+
+/** Handwritten caption strip for a photograph (transparent background). */
+export function photoCaptionTexture(text, w = 512, h = 96) {
+  const c = makeCanvas(w, h)
+  const ctx = c.getContext('2d')
+  ctx.clearRect(0, 0, w, h)
+  ctx.fillStyle = 'rgba(55,38,18,0.9)'
+  ctx.font = '600 40px "Caveat", cursive'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  let t = String(text)
+  if (t.length > 40) t = t.slice(0, 38) + '…'
+  ctx.fillText(t, w / 2, h / 2)
+  const tex = new THREE.CanvasTexture(c)
+  tex.colorSpace = THREE.SRGBColorSpace
+  return track(tex)
+}
+
+/** A small desk map — coastline, dashed route, X marks the spot. */
+export function deskMapTexture(w = 512, h = 384) {
+  const c = makeCanvas(w, h)
+  const ctx = c.getContext('2d')
+  ctx.fillStyle = '#dbc998'
+  ctx.fillRect(0, 0, w, h)
+  for (let i = 0; i < 300; i++) {
+    ctx.fillStyle = `rgba(110,85,45,${(Math.random() * 0.08).toFixed(3)})`
+    ctx.fillRect(Math.random() * w, Math.random() * h, 1.6, 1.6)
+  }
+  const edge = ctx.createRadialGradient(w / 2, h / 2, h * 0.3, w / 2, h / 2, h * 0.72)
+  edge.addColorStop(0, 'rgba(0,0,0,0)')
+  edge.addColorStop(1, 'rgba(80,50,18,0.45)')
+  ctx.fillStyle = edge
+  ctx.fillRect(0, 0, w, h)
+  // coastline
+  ctx.strokeStyle = 'rgba(60,42,20,0.8)'
+  ctx.lineWidth = 2.6
+  ctx.beginPath()
+  ctx.moveTo(30, h * 0.7)
+  for (let x = 30; x < w - 30; x += 24) {
+    ctx.quadraticCurveTo(x + 8, h * 0.7 + Math.sin(x * 0.05) * 40 - Math.random() * 18, x + 24, h * 0.7 + Math.sin((x + 24) * 0.045) * 42)
+  }
+  ctx.stroke()
+  // hatching for the sea
+  ctx.lineWidth = 1
+  ctx.strokeStyle = 'rgba(60,42,20,0.3)'
+  for (let y = h * 0.78; y < h - 16; y += 10) {
+    ctx.beginPath()
+    ctx.moveTo(24, y)
+    ctx.lineTo(w - 24, y + Math.random() * 4)
+    ctx.stroke()
+  }
+  // dashed route to an X
+  ctx.setLineDash([8, 8])
+  ctx.strokeStyle = 'rgba(140,40,28,0.85)'
+  ctx.lineWidth = 3
+  ctx.beginPath()
+  ctx.moveTo(60, 60)
+  ctx.quadraticCurveTo(w * 0.4, h * 0.15, w * 0.55, h * 0.35)
+  ctx.quadraticCurveTo(w * 0.7, h * 0.52, w * 0.78, h * 0.42)
+  ctx.stroke()
+  ctx.setLineDash([])
+  ctx.lineWidth = 6
+  ctx.beginPath()
+  ctx.moveTo(w * 0.78 - 12, h * 0.42 - 12)
+  ctx.lineTo(w * 0.78 + 12, h * 0.42 + 12)
+  ctx.moveTo(w * 0.78 + 12, h * 0.42 - 12)
+  ctx.lineTo(w * 0.78 - 12, h * 0.42 + 12)
+  ctx.stroke()
+  // compass rose
+  ctx.strokeStyle = 'rgba(60,42,20,0.7)'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.arc(70, h - 70, 26, 0, Math.PI * 2)
+  ctx.stroke()
+  ctx.beginPath()
+  ctx.moveTo(70, h - 96)
+  ctx.lineTo(76, h - 70)
+  ctx.lineTo(70, h - 44)
+  ctx.lineTo(64, h - 70)
+  ctx.closePath()
+  ctx.stroke()
+  const tex = new THREE.CanvasTexture(c)
+  tex.colorSpace = THREE.SRGBColorSpace
+  return track(tex)
+}
+
+/** An old letter/envelope for the desk. */
+export function letterTexture(w = 384, h = 256) {
+  const c = makeCanvas(w, h)
+  const ctx = c.getContext('2d')
+  ctx.fillStyle = '#e6dab6'
+  ctx.fillRect(0, 0, w, h)
+  ctx.strokeStyle = 'rgba(110,80,40,0.5)'
+  ctx.lineWidth = 3
+  ctx.strokeRect(6, 6, w - 12, h - 12)
+  // address squiggles
+  ctx.strokeStyle = 'rgba(48,32,14,0.7)'
+  ctx.lineWidth = 1.8
+  for (let i = 0; i < 3; i++) {
+    const y = h * 0.42 + i * 26
+    ctx.beginPath()
+    ctx.moveTo(w * 0.3, y)
+    let px = w * 0.3
+    while (px < w * 0.3 + (140 - i * 30)) {
+      const nx = px + 8 + Math.random() * 8
+      ctx.quadraticCurveTo(px + 4, y - 5, nx, y)
+      px = nx
+    }
+    ctx.stroke()
+  }
+  // stamp
+  ctx.strokeStyle = 'rgba(140,40,28,0.7)'
+  ctx.lineWidth = 2
+  ctx.strokeRect(w - 78, 20, 52, 62)
+  ctx.beginPath()
+  ctx.moveTo(w - 66, 66)
+  ctx.lineTo(w - 52, 36)
+  ctx.lineTo(w - 38, 66)
+  ctx.stroke()
+  // postmark
+  ctx.beginPath()
+  ctx.arc(w - 100, 50, 24, 0, Math.PI * 2)
+  ctx.stroke()
+  const tex = new THREE.CanvasTexture(c)
+  tex.colorSpace = THREE.SRGBColorSpace
+  return track(tex)
+}
+
+/** Compass face for the desk compass. */
+export function compassFaceTexture(size = 256) {
+  const c = makeCanvas(size, size)
+  const ctx = c.getContext('2d')
+  const cx = size / 2
+  ctx.fillStyle = '#e8dcc0'
+  ctx.beginPath()
+  ctx.arc(cx, cx, size * 0.48, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(60,42,20,0.85)'
+  ctx.lineWidth = 3
+  ctx.beginPath()
+  ctx.arc(cx, cx, size * 0.44, 0, Math.PI * 2)
+  ctx.stroke()
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * Math.PI * 2
+    ctx.lineWidth = i % 4 === 0 ? 3 : 1.4
+    ctx.beginPath()
+    ctx.moveTo(cx + Math.cos(a) * size * 0.36, cx + Math.sin(a) * size * 0.36)
+    ctx.lineTo(cx + Math.cos(a) * size * 0.43, cx + Math.sin(a) * size * 0.43)
+    ctx.stroke()
+  }
+  // needle
+  ctx.fillStyle = 'rgba(150,40,30,0.9)'
+  ctx.beginPath()
+  ctx.moveTo(cx, cx - size * 0.3)
+  ctx.lineTo(cx + size * 0.05, cx)
+  ctx.lineTo(cx - size * 0.05, cx)
+  ctx.closePath()
+  ctx.fill()
+  ctx.fillStyle = 'rgba(50,38,20,0.9)'
+  ctx.beginPath()
+  ctx.moveTo(cx, cx + size * 0.3)
+  ctx.lineTo(cx + size * 0.05, cx)
+  ctx.lineTo(cx - size * 0.05, cx)
+  ctx.closePath()
+  ctx.fill()
+  ctx.font = `700 ${size * 0.1}px "IM Fell English SC", serif`
+  ctx.fillStyle = 'rgba(60,42,20,0.9)'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText('N', cx, cx - size * 0.33)
   const tex = new THREE.CanvasTexture(c)
   tex.colorSpace = THREE.SRGBColorSpace
   return track(tex)

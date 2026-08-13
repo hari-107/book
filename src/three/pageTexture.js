@@ -1,10 +1,11 @@
 import * as THREE from 'three'
 import {
   INK, INK_SOFT, INK_FADED, GOLD, MARKER_YELLOW, INK_BLUE, INK_RED,
-  PAGE_TEX_W, PAGE_TEX_H,
+  PAGE_TEX_W, PAGE_TEX_H, PAGE_W, PAGE_H,
 } from '../constants.js'
 import { PLACEHOLDER_PREFIX, bookMeta } from '../data/bookContent.js'
 import { drawIndexBody } from '../components/IndexPage.js'
+import { sheetProfile, sampleTearBoundary } from './tearProfiles.js'
 
 /**
  * Prints one page face of the adventure book to a CanvasTexture.
@@ -87,11 +88,11 @@ function wobblyCircle(ctx, cx, cy, r, rnd, wobble = 2) {
 
 // ---- parchment --------------------------------------------------------------
 function paintParchment(ctx, side, rnd) {
-  // base — warm aged parchment, unevenly lit
+  // base — pale field-journal tan (reference tone), unevenly lit
   const grad = ctx.createRadialGradient(W * (0.4 + rnd() * 0.2), H * (0.35 + rnd() * 0.2), H * 0.18, W / 2, H / 2, H * 0.78)
-  grad.addColorStop(0, '#e9d7ab')
-  grad.addColorStop(0.6, '#ddc48d')
-  grad.addColorStop(1, '#c4a263')
+  grad.addColorStop(0, '#e9dfc2')
+  grad.addColorStop(0.6, '#dccda4')
+  grad.addColorStop(1, '#b3985f')
   ctx.fillStyle = grad
   ctx.fillRect(0, 0, W, H)
 
@@ -245,6 +246,126 @@ function annotation(ctx, rnd, text, x, y, rot = 0, px = 34, color = INK_FADED) {
   ctx.textAlign = 'center'
   ctx.fillText(text, 0, 0)
   ctx.restore()
+}
+
+function fingerprint(ctx, rnd, x, y, scale = 1, alpha = 0.07) {
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.rotate(rnd() * Math.PI)
+  ctx.strokeStyle = `rgba(70,48,22,${alpha})`
+  ctx.lineWidth = 2.2 * scale
+  for (let i = 0; i < 7; i++) {
+    const r = (7 + i * 5.5) * scale
+    const a0 = rnd() * Math.PI * 2
+    ctx.beginPath()
+    ctx.ellipse(0, 0, r, r * 0.72, 0.3, a0, a0 + Math.PI * (0.9 + rnd() * 0.8))
+    ctx.stroke()
+  }
+  ctx.restore()
+}
+
+function foldedCorner(ctx, rnd, corner, side) {
+  // a dog-eared fore-edge corner, drawn as light + shadow.
+  // The fore-edge sits at canvas-right on right pages, canvas-left on left pages.
+  const s = 70 + rnd() * 60
+  const top = corner === 'tr'
+  const cy = top ? 0 : H
+  const sy = top ? 1 : -1
+  const fx = side === 'right' ? W : 0
+  const sx = side === 'right' ? -1 : 1 // direction from fore-edge into the page
+  ctx.save()
+  // shadow under the fold
+  ctx.fillStyle = 'rgba(60,40,16,0.3)'
+  ctx.beginPath()
+  ctx.moveTo(fx + sx * (s + 8), cy)
+  ctx.lineTo(fx, cy + sy * (s + 8))
+  ctx.lineTo(fx, cy + sy * s)
+  ctx.lineTo(fx + sx * s, cy)
+  ctx.closePath()
+  ctx.fill()
+  // the folded flap (lighter — raw paper back)
+  ctx.fillStyle = 'rgba(238,229,200,0.95)'
+  ctx.beginPath()
+  ctx.moveTo(fx + sx * s, cy)
+  ctx.lineTo(fx, cy + sy * s)
+  ctx.lineTo(fx + sx * s * 0.94, cy + sy * s * 0.9)
+  ctx.closePath()
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(120,95,55,0.5)'
+  ctx.lineWidth = 1.6
+  ctx.beginPath()
+  ctx.moveTo(fx + sx * s, cy)
+  ctx.lineTo(fx, cy + sy * s)
+  ctx.stroke()
+  ctx.restore()
+}
+
+function burnMark(ctx, rnd, x, y, r) {
+  const g = ctx.createRadialGradient(x, y, 1, x, y, r)
+  g.addColorStop(0, 'rgba(25,14,5,0.75)')
+  g.addColorStop(0.45, 'rgba(60,32,10,0.5)')
+  g.addColorStop(0.75, 'rgba(110,64,20,0.3)')
+  g.addColorStop(1, 'rgba(140,90,35,0)')
+  ctx.fillStyle = g
+  ctx.beginPath()
+  ctx.arc(x, y, r, 0, Math.PI * 2)
+  ctx.fill()
+}
+
+// page space (x: 0=spine..PAGE_W, y: -H/2..H/2) → canvas pixels
+function pageToCanvas(x, y, side) {
+  const X = side === 'right' ? (x / PAGE_W) * W : (1 - x / PAGE_W) * W
+  const Y = (0.5 - y / PAGE_H) * H
+  return [X, Y]
+}
+
+/**
+ * Ink the real tears: a ragged dark fiber fringe just inside the geometric
+ * tear arc and a pale "paper thickness" stripe right on the torn boundary,
+ * so the collapsed mesh edge reads as thick ripped paper.
+ */
+function paintTears(ctx, face, side, rnd) {
+  const profile = sheetProfile(Math.floor(face.faceIndex / 2))
+  for (const tear of profile.tears) {
+    const pts = sampleTearBoundary(tear, 72).map(([x, y]) => pageToCanvas(x, y, side))
+    // shadowed fiber fringe inside the kept paper
+    ctx.save()
+    ctx.lineCap = 'round'
+    ctx.strokeStyle = 'rgba(58,38,16,0.5)'
+    ctx.lineWidth = 13
+    ctx.beginPath()
+    pts.forEach(([X, Y], i) => (i === 0 ? ctx.moveTo(X, Y) : ctx.lineTo(X, Y)))
+    ctx.stroke()
+    ctx.strokeStyle = 'rgba(90,62,28,0.4)'
+    ctx.lineWidth = 26
+    ctx.globalAlpha = 0.4
+    ctx.stroke()
+    ctx.globalAlpha = 1
+    // pale torn-fiber edge (paper core thickness)
+    ctx.strokeStyle = 'rgba(243,235,212,0.92)'
+    ctx.lineWidth = 5
+    ctx.beginPath()
+    pts.forEach(([X, Y], i) => {
+      const jx = X + (rnd() - 0.5) * 4
+      const jy = Y + (rnd() - 0.5) * 4
+      i === 0 ? ctx.moveTo(jx, jy) : ctx.lineTo(jx, jy)
+    })
+    ctx.stroke()
+    // stray fibers
+    for (let i = 0; i < pts.length; i += 6) {
+      const [X, Y] = pts[i]
+      ctx.strokeStyle = 'rgba(243,235,212,0.7)'
+      ctx.lineWidth = 1.6
+      ctx.beginPath()
+      ctx.moveTo(X, Y)
+      ctx.lineTo(X + (rnd() - 0.5) * 14, Y + (rnd() - 0.5) * 14)
+      ctx.stroke()
+    }
+    ctx.restore()
+    // a note that carries on across the tear
+    const [mx, my] = pts[Math.floor(pts.length / 2)]
+    annotation(ctx, rnd, 'this part is lost to history…', mx + (side === 'right' ? -130 : 130), my + 60, -0.08, 27)
+  }
 }
 
 // ---- doodle library ------------------------------------------------------------
@@ -629,6 +750,11 @@ const themeDecor = {
       annotation(ctx, rnd, '(double-click it. obviously.)', bx, by + 78, 0.03, 26)
       return [uvRect(bx - 130, by - 60, bx + 130, by + 60, 'egg')]
     }
+    if (face.id === 'fun-2') {
+      // hidden interactive: the robot itself is ticklish
+      annotation(ctx, rnd, 'do not tickle the robot', W - 170, H - 300, 0.06, 24)
+      return [uvRect(W - 280, H - 540, W - 60, H - 320, 'egg')]
+    }
     return []
   },
   letter(ctx, rnd) {
@@ -943,6 +1069,12 @@ export function renderPageFace(face, side) {
   // occasional stains — same physical world on every page
   if (rnd() > 0.55) coffeeRing(ctx, rnd, MARGIN + rnd() * (W - 2 * MARGIN), 200 + rnd() * (H - 500), 46 + rnd() * 40)
   if (rnd() > 0.5) inkSplat(ctx, rnd, rnd() * W, rnd() * H, 'rgba(45,30,10,0.35)', 0.6 + rnd() * 0.7)
+  if (rnd() > 0.6) fingerprint(ctx, rnd, W * (0.15 + rnd() * 0.7), H * (0.12 + rnd() * 0.76), 1 + rnd() * 0.5)
+  if (rnd() > 0.82) fingerprint(ctx, rnd, W * rnd(), H * rnd(), 0.8, 0.05)
+  if (rnd() > 0.78) burnMark(ctx, rnd, rnd() > 0.5 ? W * 0.06 + rnd() * 40 : W * 0.94 - rnd() * 40, H * (0.2 + rnd() * 0.6), 18 + rnd() * 26)
+
+  const hasTear = sheetProfile(Math.floor(face.faceIndex / 2)).tears.length > 0
+  if (!hasTear && rnd() > 0.72) foldedCorner(ctx, rnd, rnd() > 0.5 ? 'tr' : 'br', side)
 
   if (face.kind !== 'blank') {
     if (face.theme === 'title') {
@@ -963,6 +1095,9 @@ export function renderPageFace(face, side) {
   } else {
     regions.push(drawLogoStamp(ctx, rnd))
   }
+
+  // ink the real tears last so the fringe overlays whatever sits near them
+  paintTears(ctx, face, side, rnd)
 
   const texture = new THREE.CanvasTexture(canvas)
   texture.colorSpace = THREE.SRGBColorSpace

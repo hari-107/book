@@ -3,7 +3,17 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { gsap } from 'gsap'
 import { useBookStore } from '../store/useBookStore.js'
-import { paperScrapTexture, wordTexture, gearTexture, woodTexture } from '../three/proceduralTextures.js'
+import {
+  paperScrapTexture,
+  wordTexture,
+  gearTexture,
+  woodTexture,
+  deskMapTexture,
+  letterTexture,
+  compassFaceTexture,
+  scrapDocumentTexture,
+} from '../three/proceduralTextures.js'
+import { DESK_Y, GOLD } from '../constants.js'
 
 /**
  * The living, chaotic environment behind the book: drifting dust, ember
@@ -297,6 +307,120 @@ function EggBurst() {
   )
 }
 
+/** Flat paper props lying on the desk. */
+function DeskPaper({ tex, x, z, w, h, rot }) {
+  return (
+    <mesh rotation={[-Math.PI / 2, 0, rot]} position={[x, DESK_Y + 0.002, z]}>
+      <planeGeometry args={[w, h]} />
+      <meshStandardMaterial map={tex} roughness={0.9} />
+    </mesh>
+  )
+}
+
+/**
+ * The explorer's desk: maps, letters, a compass, a magnifying glass, ink
+ * bottle, pencils, coins and a candle whose light breathes. Props flank the
+ * book so it stays the hero; everything shares the same warm physical world.
+ */
+function DeskObjects() {
+  const flameRef = useRef()
+  const lightRef = useRef()
+  const mapTex = useMemo(() => deskMapTexture(), [])
+  const letterTex = useMemo(() => letterTexture(), [])
+  const compassTex = useMemo(() => compassFaceTexture(), [])
+  const docTex = useMemo(() => scrapDocumentTexture(42), [])
+
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime()
+    // candle flicker — light breathes, flame quivers, shadows move
+    const flick = 0.62 + Math.sin(t * 9.3) * 0.06 + Math.sin(t * 23.7) * 0.05 + Math.sin(t * 3.1) * 0.06
+    if (lightRef.current) lightRef.current.intensity = flick
+    if (flameRef.current) {
+      flameRef.current.scale.set(1 + Math.sin(t * 17) * 0.12, 1 + Math.sin(t * 13.3) * 0.2, 1)
+      flameRef.current.position.x = Math.sin(t * 11.7) * 0.004
+    }
+  })
+
+  return (
+    <group>
+      {/* scattered documents */}
+      <DeskPaper tex={mapTex} x={-2.2} z={0.35} w={1.05} h={0.78} rot={0.3} />
+      <DeskPaper tex={letterTex} x={2.15} z={0.55} w={0.62} h={0.42} rot={-0.4} />
+      <DeskPaper tex={docTex} x={2.5} z={-0.4} w={0.5} h={0.62} rot={0.9} />
+      <DeskPaper tex={mapTex} x={-2.7} z={-0.9} w={0.9} h={0.66} rot={-1.2} />
+
+      {/* compass */}
+      <group position={[1.95, DESK_Y + 0.026, 1.05]}>
+        <mesh>
+          <cylinderGeometry args={[0.11, 0.11, 0.045, 28]} />
+          <meshStandardMaterial color={GOLD} metalness={0.7} roughness={0.4} />
+        </mesh>
+        <mesh position={[0, 0.024, 0]} rotation={[-Math.PI / 2, 0, 0.6]}>
+          <circleGeometry args={[0.095, 28]} />
+          <meshStandardMaterial map={compassTex} roughness={0.5} />
+        </mesh>
+      </group>
+
+      {/* magnifying glass */}
+      <group position={[-2.05, DESK_Y + 0.02, 1.0]} rotation={[-Math.PI / 2, 0, 2.4]}>
+        <mesh>
+          <torusGeometry args={[0.1, 0.014, 10, 28]} />
+          <meshStandardMaterial color={GOLD} metalness={0.7} roughness={0.35} />
+        </mesh>
+        <mesh>
+          <circleGeometry args={[0.095, 24]} />
+          <meshStandardMaterial color="#cfe3dd" transparent opacity={0.18} roughness={0.15} metalness={0.1} />
+        </mesh>
+        <mesh position={[0.19, 0, 0]} rotation={[0, 0, Math.PI / 2]}>
+          <cylinderGeometry args={[0.014, 0.018, 0.2, 10]} />
+          <meshStandardMaterial color="#3a2415" roughness={0.6} />
+        </mesh>
+      </group>
+
+      {/* ink bottle + quill-pencils */}
+      <group position={[2.35, DESK_Y, -1.1]}>
+        <mesh position={[0, 0.055, 0]}>
+          <cylinderGeometry args={[0.06, 0.07, 0.11, 16]} />
+          <meshStandardMaterial color="#151a24" roughness={0.25} metalness={0.15} />
+        </mesh>
+        <mesh position={[0, 0.125, 0]}>
+          <cylinderGeometry args={[0.026, 0.026, 0.03, 10]} />
+          <meshStandardMaterial color="#4a3020" roughness={0.7} />
+        </mesh>
+      </group>
+      <mesh position={[1.7, DESK_Y + 0.012, -0.75]} rotation={[0, 0.9, Math.PI / 2]}>
+        <cylinderGeometry args={[0.009, 0.009, 0.34, 6]} />
+        <meshStandardMaterial color="#7a5a30" roughness={0.8} />
+      </mesh>
+      <mesh position={[1.85, DESK_Y + 0.012, -0.65]} rotation={[0, 1.25, Math.PI / 2]}>
+        <cylinderGeometry args={[0.009, 0.009, 0.3, 6]} />
+        <meshStandardMaterial color="#54381e" roughness={0.8} />
+      </mesh>
+
+      {/* scattered coins */}
+      {[[-1.75, 0.55], [-1.62, 0.7], [2.4, 1.25]].map(([x, z], i) => (
+        <mesh key={i} position={[x, DESK_Y + 0.008, z]} rotation={[-Math.PI / 2, 0, i * 1.3]}>
+          <cylinderGeometry args={[0.035, 0.035, 0.008, 18]} />
+          <meshStandardMaterial color={GOLD} metalness={0.75} roughness={0.45} />
+        </mesh>
+      ))}
+
+      {/* candle — wax, quivering flame, breathing light */}
+      <group position={[-2.5, DESK_Y, -0.9]}>
+        <mesh position={[0, 0.09, 0]}>
+          <cylinderGeometry args={[0.05, 0.058, 0.18, 14]} />
+          <meshStandardMaterial color="#e8dcbe" roughness={0.6} />
+        </mesh>
+        <mesh ref={flameRef} position={[0, 0.215, 0]}>
+          <coneGeometry args={[0.018, 0.06, 8]} />
+          <meshBasicMaterial color="#ffc466" toneMapped={false} transparent opacity={0.95} />
+        </mesh>
+        <pointLight ref={lightRef} position={[0, 0.3, 0]} intensity={0.6} color="#ffb45e" distance={5.5} decay={1.6} />
+      </group>
+    </group>
+  )
+}
+
 export default function BackgroundWorld() {
   const groupRef = useRef()
   const wood = useMemo(() => woodTexture(), [])
@@ -330,8 +454,9 @@ export default function BackgroundWorld() {
         <Gears />
       </group>
       <EggBurst />
+      <DeskObjects />
       {/* the desk the book rests on */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.36, -0.6]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, DESK_Y - 0.002, -0.6]}>
         <planeGeometry args={[26, 16]} />
         <meshStandardMaterial map={wood} roughness={0.92} metalness={0.02} />
       </mesh>
