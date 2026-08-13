@@ -150,6 +150,39 @@ function paintParchment(ctx, side, rnd) {
     ctx.stroke()
   }
 
+  // hard fold creases — a light ridge with a shadow valley beside it
+  const creaseCount = 1 + Math.floor(rnd() * 2)
+  for (let i = 0; i < creaseCount; i++) {
+    const vertical = rnd() > 0.5
+    const p = 0.25 + rnd() * 0.5
+    ctx.lineWidth = 2
+    if (vertical) {
+      const x = p * W
+      ctx.strokeStyle = 'rgba(255,248,225,0.16)'
+      ctx.beginPath()
+      ctx.moveTo(x, H * 0.08)
+      ctx.lineTo(x + (rnd() - 0.5) * 30, H * 0.92)
+      ctx.stroke()
+      ctx.strokeStyle = 'rgba(70,48,20,0.16)'
+      ctx.beginPath()
+      ctx.moveTo(x + 3, H * 0.08)
+      ctx.lineTo(x + 3 + (rnd() - 0.5) * 30, H * 0.92)
+      ctx.stroke()
+    } else {
+      const y = p * H
+      ctx.strokeStyle = 'rgba(255,248,225,0.16)'
+      ctx.beginPath()
+      ctx.moveTo(W * 0.08, y)
+      ctx.lineTo(W * 0.92, y + (rnd() - 0.5) * 30)
+      ctx.stroke()
+      ctx.strokeStyle = 'rgba(70,48,20,0.16)'
+      ctx.beginPath()
+      ctx.moveTo(W * 0.08, y + 3)
+      ctx.lineTo(W * 0.92, y + 3 + (rnd() - 0.5) * 30)
+      ctx.stroke()
+    }
+  }
+
   // burnt, darkened borders
   const edge = (x0, y0, x1, y1) => {
     const g = ctx.createLinearGradient(x0, y0, x1, y1)
@@ -320,51 +353,95 @@ function pageToCanvas(x, y, side) {
 }
 
 /**
- * Ink the real tears: a ragged dark fiber fringe just inside the geometric
- * tear arc and a pale "paper thickness" stripe right on the torn boundary,
- * so the collapsed mesh edge reads as thick ripped paper.
+ * Ink the real tears so the collapsed mesh edge reads as thick, ripped,
+ * curled paper: a wide soft contact shadow of the lifted fringe, a dark
+ * inner fiber band, a bright jagged paper-core lip that catches light, and
+ * hair-fine fibers straggling past the edge into the missing region.
  */
 function paintTears(ctx, face, side, rnd) {
   const profile = sheetProfile(Math.floor(face.faceIndex / 2))
   for (const tear of profile.tears) {
-    const pts = sampleTearBoundary(tear, 72).map(([x, y]) => pageToCanvas(x, y, side))
-    // shadowed fiber fringe inside the kept paper
+    const bpts = sampleTearBoundary(tear, 150) // page space
+    const pts = bpts.map(([x, y]) => pageToCanvas(x, y, side))
+    // inward normal (into kept paper) for each boundary point
+    const normals = bpts.map(([x, y]) => {
+      const dx = x - tear.c[0]
+      const dy = y - tear.c[1]
+      const d = Math.hypot(dx, dy) || 1
+      // toward center = into the missing region; negate for "into kept paper"
+      const inx = -dx / d
+      const iny = -dy / d
+      // page→canvas flips x on the left face and always flips y
+      return [side === 'right' ? inx : -inx, -iny]
+    })
+
     ctx.save()
     ctx.lineCap = 'round'
-    ctx.strokeStyle = 'rgba(58,38,16,0.5)'
-    ctx.lineWidth = 13
-    ctx.beginPath()
-    pts.forEach(([X, Y], i) => (i === 0 ? ctx.moveTo(X, Y) : ctx.lineTo(X, Y)))
-    ctx.stroke()
-    ctx.strokeStyle = 'rgba(90,62,28,0.4)'
-    ctx.lineWidth = 26
-    ctx.globalAlpha = 0.4
-    ctx.stroke()
-    ctx.globalAlpha = 1
-    // pale torn-fiber edge (paper core thickness)
-    ctx.strokeStyle = 'rgba(243,235,212,0.92)'
-    ctx.lineWidth = 5
+    ctx.lineJoin = 'round'
+
+    // 1) soft cast shadow of the curled fringe, offset into the kept paper
+    ctx.strokeStyle = 'rgba(48,30,12,0.32)'
+    ctx.lineWidth = 34
     ctx.beginPath()
     pts.forEach(([X, Y], i) => {
-      const jx = X + (rnd() - 0.5) * 4
-      const jy = Y + (rnd() - 0.5) * 4
+      const [nx, ny] = normals[i]
+      const x = X + nx * 16
+      const y = Y + ny * 16
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
+    })
+    ctx.stroke()
+
+    // 2) dark inner fiber band right at the rip
+    ctx.strokeStyle = 'rgba(70,46,20,0.6)'
+    ctx.lineWidth = 12
+    ctx.beginPath()
+    pts.forEach(([X, Y], i) => {
+      const [nx, ny] = normals[i]
+      const x = X + nx * 5
+      const y = Y + ny * 5
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
+    })
+    ctx.stroke()
+
+    // 3) bright torn paper-core lip (the exposed inner fibers, catching light)
+    ctx.strokeStyle = 'rgba(247,240,220,0.95)'
+    ctx.lineWidth = 6
+    ctx.beginPath()
+    pts.forEach(([X, Y], i) => {
+      const jx = X + (rnd() - 0.5) * 3
+      const jy = Y + (rnd() - 0.5) * 3
       i === 0 ? ctx.moveTo(jx, jy) : ctx.lineTo(jx, jy)
     })
     ctx.stroke()
-    // stray fibers
-    for (let i = 0; i < pts.length; i += 6) {
+    // thin warm underline just beneath the lip → paper thickness
+    ctx.strokeStyle = 'rgba(205,175,120,0.8)'
+    ctx.lineWidth = 2.4
+    ctx.beginPath()
+    pts.forEach(([X, Y], i) => {
+      const [nx, ny] = normals[i]
+      const x = X - nx * 3
+      const y = Y - ny * 3
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
+    })
+    ctx.stroke()
+
+    // 4) straggling fibers reaching out past the edge into the gap
+    for (let i = 0; i < pts.length; i += 3) {
       const [X, Y] = pts[i]
-      ctx.strokeStyle = 'rgba(243,235,212,0.7)'
-      ctx.lineWidth = 1.6
+      const [nx, ny] = normals[i]
+      const len = 4 + rnd() * 16
+      ctx.strokeStyle = `rgba(232,222,196,${(0.4 + rnd() * 0.45).toFixed(2)})`
+      ctx.lineWidth = 0.8 + rnd() * 1.1
       ctx.beginPath()
-      ctx.moveTo(X, Y)
-      ctx.lineTo(X + (rnd() - 0.5) * 14, Y + (rnd() - 0.5) * 14)
+      ctx.moveTo(X + nx * 2, Y + ny * 2)
+      ctx.lineTo(X - nx * len + (rnd() - 0.5) * 10, Y - ny * len + (rnd() - 0.5) * 10)
       ctx.stroke()
     }
     ctx.restore()
+
     // a note that carries on across the tear
     const [mx, my] = pts[Math.floor(pts.length / 2)]
-    annotation(ctx, rnd, 'this part is lost to history…', mx + (side === 'right' ? -130 : 130), my + 60, -0.08, 27)
+    annotation(ctx, rnd, 'this part is lost to history…', mx + (side === 'right' ? -140 : 140), my + 66, -0.08, 27)
   }
 }
 
@@ -755,6 +832,26 @@ const themeDecor = {
       annotation(ctx, rnd, 'do not tickle the robot', W - 170, H - 300, 0.06, 24)
       return [uvRect(W - 280, H - 540, W - 60, H - 320, 'egg')]
     }
+    return []
+  },
+  reports(ctx, rnd) {
+    ink(ctx, 0.55)
+    // TOP SECRET / DECLASSIFIED stamp
+    rubberStamp(ctx, rnd, 'DECLASSIFIED', W - 210, 190, -0.16, INK_RED)
+    // a redacted bar
+    ctx.fillStyle = 'rgba(20,14,6,0.9)'
+    ctx.fillRect(W - 320, H - 360, 220, 34)
+    annotation(ctx, rnd, 'need-to-know', W - 210, H - 316, 0.05, 24)
+    // terminal braces / flag glyphs
+    ctx.fillStyle = INK_FADED
+    ctx.font = TYPE_FONT(30)
+    ctx.textAlign = 'left'
+    ctx.fillText('flag{ ... }', W - 300, H - 250)
+    // blinking-cursor block
+    ctx.fillStyle = 'rgba(40,90,60,0.7)'
+    ctx.fillRect(W - 150, H - 272, 16, 26)
+    doodles.arrow(ctx, rnd, W - 320, 300, 90, 0.5)
+    annotation(ctx, rnd, 'solved.', W - 190, 300, -0.1, 30, 'rgba(40,90,60,0.8)')
     return []
   },
   letter(ctx, rnd) {

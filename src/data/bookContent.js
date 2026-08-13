@@ -189,29 +189,74 @@ export const sections = [
     pages: [
       {
         id: 'projects-1',
-        heading: 'The Blueprints',
+        heading: 'Evidence Recovered',
         blocks: [
-          { type: 'subheading', text: '[PLACEHOLDER — Project One name]' },
-          { type: 'paragraph', text: '[PLACEHOLDER — what it is, what you built, what it achieved.]' },
-          { type: 'subheading', text: '[PLACEHOLDER — Project Two name]' },
-          { type: 'paragraph', text: '[PLACEHOLDER — one paragraph description.]' },
+          { type: 'note', text: 'Specimens gathered in the field. All details taken from the repositories themselves — nothing embellished.' },
+          { type: 'subheading', text: 'No. 01 · LLM Prompt-Injection Firewall' },
+          { type: 'paragraph', text: 'A production-oriented security gateway that inspects every prompt before it reaches an LLM and every response before it reaches the user — detecting, blocking, sanitizing, logging and explaining prompt-injection and jailbreak attempts and sensitive-data leaks.' },
+          { type: 'list', items: [
+            'Pure-Python detection core: normalize → rules → classifier → risk scoring → sanitize/output-scan.',
+            'Django layer: RBAC (admin/analyst/auditor), JWT + API-key auth, DRF endpoints, Swagger.',
+            'Tamper-evident audit log via a per-row SHA-256 hash chain; dark Chart.js dashboard; PDF forensic reports.',
+            'Layered decoding (base64/hex/url/rot13/unicode) + invisible-char stripping; MITRE-ATLAS-style rule tags.',
+          ] },
+          { type: 'rows', rows: [
+            ['Stack', 'Python · Django · DRF · Postgres · Redis · Docker'],
+            ['Repo', 'github.com/hari-107/llm-prompt-injection-firewall (private)'],
+          ] },
         ],
         images: [
-          { id: 'proj-img-1', src: null, caption: '[PLACEHOLDER — Project One screenshot]', detail: 'projects-1' },
-          { id: 'proj-img-2', src: null, caption: '[PLACEHOLDER — Project Two screenshot]', detail: 'projects-1' },
-          { id: 'proj-img-3', src: null, caption: '[PLACEHOLDER — detail view]', detail: 'projects-2' },
+          { id: 'proj-firewall', src: null, caption: 'Firewall dashboard — blocked injection attempt', detail: 'projects-1' },
         ],
       },
       {
         id: 'projects-2',
-        heading: 'More Contraptions',
+        heading: 'Evidence, Cont’d',
         blocks: [
-          { type: 'subheading', text: '[PLACEHOLDER — Project Three name]' },
-          { type: 'paragraph', text: '[PLACEHOLDER — one paragraph description.]' },
-          { type: 'note', text: '[PLACEHOLDER — link to a live demo or repo]' },
+          { type: 'subheading', text: 'No. 02 · WebSec Scanner' },
+          { type: 'paragraph', text: 'A Django platform that runs an automated, multi-stage security assessment against a target site — recon, SSL/TLS, tech detection, port scan, directory enumeration, crawling, then non-destructive SQLi / XSS / misconfig / auth tests — correlated into a CVSS-scored report with PDF export. Consent-gated; authorised use only.' },
+          { type: 'list', items: [
+            'Fault-tolerant sequential pipeline — one module failing never aborts the run.',
+            'Auto-detects nmap / ffuf / whatweb / nikto, with pure-Python fallbacks so it runs tool-free.',
+            'Live progress streaming, side-by-side scan comparison, findings with evidence, CWE and remediation.',
+          ] },
+          { type: 'rows', rows: [
+            ['Stack', 'Python · Django · MySQL · Bootstrap · Chart.js · ReportLab'],
+            ['Repo', 'github.com/hari-107/web-scanning (private)'],
+          ] },
+          { type: 'subheading', text: 'No. 03 · Crypto Lab' },
+          { type: 'paragraph', text: '“My first project” — a clean vanilla-JS encryption/decryption tool with five algorithms (Caesar, XOR, Base64, Vigenère, SHA-256), a CyberChef-style Magic auto-detector using frequency analysis, and a dark/light theme.' },
+          { type: 'rows', rows: [
+            ['Stack', 'HTML5 · CSS3 · Vanilla JS · Web Crypto API'],
+            ['Repo', 'github.com/hari-107/crypto-lab (public)'],
+          ] },
         ],
         images: [
-          { id: 'proj-img-4', src: null, caption: '[PLACEHOLDER — Project Three screenshot]', detail: 'projects-2' },
+          { id: 'proj-webscan', src: null, caption: 'WebSec Scanner — findings report', detail: 'projects-2' },
+          { id: 'proj-cryptolab', src: null, caption: 'Crypto Lab — the first build', detail: 'projects-2' },
+        ],
+      },
+      {
+        id: 'projects-3',
+        heading: 'Evidence, Final Case',
+        blocks: [
+          { type: 'subheading', text: 'No. 04 · Advanced Crypto Lab' },
+          { type: 'paragraph', text: 'A Flask single-page successor to Crypto Lab: 30+ algorithms (classical ciphers, modern encodings, AES/DES/3DES/ChaCha20/RSA, hashing/HMAC/bcrypt/PBKDF2) plus a registry-driven Magic engine that scores candidates on printable ratio, word/letter frequency, entropy and UTF-8 validity, then recursively decodes and explains.' },
+          { type: 'rows', rows: [
+            ['Stack', 'Python · Flask · Bootstrap · vanilla JS'],
+            ['Repo', 'github.com/hari-107/crypto-lab-adv (private)'],
+          ] },
+          { type: 'subheading', text: 'No. 05 · Smart Agriculture Assistant' },
+          { type: 'paragraph', text: 'A Flask (Blueprints + SQLAlchemy) agricultural management system with an AI chatbot for crop-cultivation guidance built on a Tamil Nadu crop dataset — crop guides and schedules, role-based auth, a REST API with Swagger docs, and a responsive UI.' },
+          { type: 'rows', rows: [
+            ['Stack', 'Python · Flask · SQLAlchemy · MySQL · Swagger'],
+            ['Repo', 'github.com/hari-107/Smart-Agriculture-Assistant (private)'],
+          ] },
+          { type: 'note', text: 'Four of the five repos are private — ping me for a walkthrough or access.' },
+        ],
+        images: [
+          { id: 'proj-cryptoadv', src: null, caption: 'Advanced Crypto Lab — Magic analysis', detail: 'projects-3' },
+          { id: 'proj-agri', src: null, caption: 'Agri Assistant — chatbot + crop guides', detail: 'projects-3' },
         ],
       },
     ],
@@ -267,6 +312,39 @@ export const sections = [
         blocks: [
           { type: 'paragraph', text: '[PLACEHOLDER — the achievement you are proudest of, and the story behind it.]' },
           { type: 'note', text: '[PLACEHOLDER — a tiny brag you pretend is casual]' },
+        ],
+        images: [],
+      },
+    ],
+  },
+  {
+    id: 'writeups',
+    title: 'Field Reports',
+    theme: 'reports',
+    pages: [
+      {
+        id: 'writeups-1',
+        heading: 'CTF Field Reports',
+        blocks: [
+          { type: 'note', text: 'Recovered from the DEF CON CTF 2026 expedition. Two challenges, fully written up.' },
+          { type: 'subheading', text: 'Absolute Cinema · OSINT · Medium' },
+          { type: 'paragraph', text: 'Traced the challenge to a terminal-recording platform, located the author’s uploaded session, inspected the recording frame by frame, and decoded a Base64 flag hidden in the static system information.' },
+          { type: 'subheading', text: 'Revelations · Cryptography · Easy' },
+          { type: 'paragraph', text: 'Identified the challenge image as the Celestial Alphabet, decoded the symbols, and wrapped the recovered phrase in the flag format.' },
+          { type: 'rows', rows: [
+            ['Repo', 'github.com/hari-107/defcon-writeups (public)'],
+          ] },
+        ],
+        images: [
+          { id: 'wu-defcon', src: null, caption: 'DEF CON CTF 2026 — writeup pages', detail: 'writeups-1' },
+        ],
+      },
+      {
+        id: 'writeups-2',
+        heading: 'The Case Notes',
+        blocks: [
+          { type: 'paragraph', text: 'Each report keeps its own full walkthrough and supporting screenshots, with relative image links so the notes read straight from the repository.' },
+          { type: 'note', text: '[PLACEHOLDER — add new writeups here as you solve them.]' },
         ],
         images: [],
       },

@@ -13,6 +13,7 @@ import {
 } from '../three/proceduralTextures.js'
 import { createSheetUniforms } from '../three/bendMaterial.js'
 import { buildSheetGeometries, disposeSheetGeometries } from '../three/sheetGeometry.js'
+import { tearShadowSpots } from '../three/tearProfiles.js'
 import PageEphemera from './PageEphemera.jsx'
 import { useBookStore } from '../store/useBookStore.js'
 import { FrontCover, BackCover } from './Cover.jsx'
@@ -405,6 +406,7 @@ export default function Book() {
                 texture={faceRender[leftFaceIdx].texture}
                 regions={faceRender[leftFaceIdx].regions}
                 geometry={sheetGeoms[Math.floor(leftFaceIdx / 2)].left}
+                tearShadows={tearShadowSpots(leftFaceIdx, 'left')}
                 z={effLeft * SHEET_T + 0.0025}
                 onDoubleActivate={faceDouble}
               />
@@ -415,6 +417,7 @@ export default function Book() {
                 texture={faceRender[rightFaceIdx].texture}
                 regions={faceRender[rightFaceIdx].regions}
                 geometry={sheetGeoms[Math.floor(rightFaceIdx / 2)].front}
+                tearShadows={tearShadowSpots(rightFaceIdx, 'right')}
                 z={effRight * SHEET_T + 0.0025}
                 onDoubleActivate={faceDouble}
               />

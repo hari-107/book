@@ -91,6 +91,22 @@ const icons = {
     ctx.lineTo(x + 4, y + 11)
     ctx.stroke()
   },
+  writeups(ctx, x, y) {
+    // document with a corner fold + flag tick
+    ctx.strokeRect(x - 9, y - 11, 16, 22)
+    ctx.beginPath()
+    ctx.moveTo(x + 2, y - 11)
+    ctx.lineTo(x + 7, y - 6)
+    ctx.lineTo(x + 2, y - 6)
+    ctx.closePath()
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.moveTo(x - 5, y - 2)
+    ctx.lineTo(x + 2, y - 2)
+    ctx.moveTo(x - 5, y + 3)
+    ctx.lineTo(x + 3, y + 3)
+    ctx.stroke()
+  },
   education(ctx, x, y) {
     // grad cap
     ctx.beginPath()
@@ -143,23 +159,27 @@ const icons = {
 export function drawIndexBody(ctx, rnd) {
   const regions = []
 
-  ctx.font = HAND_FONT(30)
+  ctx.font = HAND_FONT(28)
   ctx.fillStyle = INK_SOFT
   ctx.textAlign = 'center'
-  ctx.fillText('double-click an entry — the pages will turn', W / 2, 330)
+  ctx.fillText('double-click an entry — the pages will turn', W / 2, 312)
 
   // decorative red ✗ in the top corner (mockup)
   ctx.strokeStyle = INK_RED
   ctx.lineWidth = 5
   ctx.beginPath()
-  ctx.moveTo(W - 96, 108)
-  ctx.lineTo(W - 60, 146)
-  ctx.moveTo(W - 60, 108)
-  ctx.lineTo(W - 96, 146)
+  ctx.moveTo(W - 96, 104)
+  ctx.lineTo(W - 60, 142)
+  ctx.moveTo(W - 60, 104)
+  ctx.lineTo(W - 96, 142)
   ctx.stroke()
 
-  let y = 412
-  const rowH = 84
+  // adaptive spacing so any number of entries clears the page foot
+  const top = 372
+  const bottom = H - 200
+  const n = INDEX_ENTRIES.length
+  const rowH = Math.min(84, (bottom - top) / n)
+  let y = top + rowH * 0.5
   INDEX_ENTRIES.forEach((entry, i) => {
     const rowTop = y - 42
 

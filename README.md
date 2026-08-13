@@ -72,13 +72,17 @@ src/data/bookContent.js
 - Structure: `section → pages → content blocks → images → navigation target`.
 - Every page has a unique `id`; the INDEX and the compass-seal map resolve
   pages through those ids — no component code changes needed.
-- The INDEX lists the nine sections (About Me, Skills, Experience, Projects,
-  Certifications, Achievements, Education, Fun Zone, Contact Me) plus The
-  End, each jumping to that section's first page. Deeper pages are reached by
-  turning or via the map.
+- The INDEX lists ten sections (About Me, Skills, Experience, Projects,
+  Certifications, Achievements, Field Reports, Education, Fun Zone, Contact
+  Me) plus The End, each jumping to that section's first page. Deeper pages
+  are reached by turning or via the map.
+- The **Projects** and **Field Reports** sections are populated with real
+  repositories from github.com/hari-107; every description is drawn from the
+  repos' own READMEs. Project screenshots are labelled placeholders — set an
+  image `src` in bookContent.js to drop in a real screenshot.
 - Each section has a `theme` that drives its hand-drawn personality:
   `explorer`, `inventor`, `journal`, `blueprint`, `stamps`, `treasure`,
-  `scholar`, `chaos`, `letter`.
+  `reports`, `scholar`, `chaos`, `letter`.
 - Image entries accept a `src` URL; while `src` is `null` (or fails to load)
   a labelled polaroid placeholder is drawn — a broken asset never breaks the
   book.

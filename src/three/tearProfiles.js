@@ -24,6 +24,39 @@ function mulberry32(a) {
 }
 
 /**
+ * Deterministic 1-D value noise in [0,1] — smooth, repeatable, no Math.random,
+ * so the SAME ragged boundary is produced in geometry and texture.
+ */
+function hash1(n) {
+  const s = Math.sin(n * 127.1) * 43758.5453
+  return s - Math.floor(s)
+}
+function vnoise(t) {
+  const i = Math.floor(t)
+  const f = t - i
+  const u = f * f * (3 - 2 * f)
+  return hash1(i) * (1 - u) + hash1(i + 1) * u
+}
+
+/**
+ * Multi-octave ragged radius factor around a torn arc. Combines big lobes,
+ * medium chunks, and sharp high-frequency serration plus occasional deep
+ * notches — never a smooth arc.
+ */
+function raggedFactor(t, seed) {
+  const base =
+    0.62 +
+    0.16 * Math.sin(t * 6.3 + seed) +
+    0.12 * (vnoise(t * 9 + seed * 3.7) - 0.5) * 2 + // medium chunks
+    0.1 * (vnoise(t * 34 + seed * 8.1) - 0.5) * 2 + // fine serration
+    0.05 * (vnoise(t * 90 + seed * 2.3) - 0.5) * 2 // micro grain
+  // occasional deep notch where the fiber gave way
+  const notch = vnoise(t * 5 + seed * 5.5)
+  const cut = notch > 0.82 ? (notch - 0.82) * 1.8 : 0
+  return Math.max(0.28, base - cut)
+}
+
+/**
  * Tear descriptor:
  *   c      — center point in page space (x: 0 at spine → PAGE_W, y: -H/2..H/2)
  *   th0/th1 — angular range (radians) of the tear boundary arc around c
@@ -31,19 +64,16 @@ function mulberry32(a) {
  */
 function cornerTear(corner, r, seed) {
   const rr = r * PAGE_W
-  const s1 = 3 + seed * 11
-  const s2 = 7 + seed * 5
-  const R = (t) => rr * (0.72 + 0.2 * Math.sin(t * 9.2 + s1) + 0.08 * Math.sin(t * 23.7 + s2))
-  if (corner === 'tr') return { c: [PAGE_W, PAGE_H / 2], th0: Math.PI, th1: Math.PI * 1.5, R }
+  const R = (t) => rr * raggedFactor(t, 3 + seed * 11)
+  if (corner === 'tr') return { c: [PAGE_W, PAGE_H / 2], th0: Math.PI, th1: Math.PI * 1.5, R, seed }
   // 'br'
-  return { c: [PAGE_W, -PAGE_H / 2], th0: Math.PI * 0.5, th1: Math.PI, R }
+  return { c: [PAGE_W, -PAGE_H / 2], th0: Math.PI * 0.5, th1: Math.PI, R, seed }
 }
 
 function bottomBite(x, r, seed) {
   const rr = r * PAGE_W
-  const s1 = 5 + seed * 9
-  const R = (t) => rr * (0.7 + 0.22 * Math.sin(t * 7.3 + s1) + 0.08 * Math.sin(t * 19.1 + s1 * 2))
-  return { c: [x * PAGE_W, -PAGE_H / 2], th0: 0, th1: Math.PI, R }
+  const R = (t) => rr * raggedFactor(t, 5 + seed * 9)
+  return { c: [x * PAGE_W, -PAGE_H / 2], th0: 0, th1: Math.PI, R, seed }
 }
 
 const profileCache = new Map()
@@ -63,14 +93,47 @@ export function sheetProfile(j) {
   return profile
 }
 
-/** Deckle inset (page units) along an edge; t ∈ [0,1] along that edge. */
+/** Deckle inset (page units) along an edge; t ∈ [0,1] along that edge. Deeper, more irregular. */
 export function deckleInset(edge, t, seed) {
   const base =
-    Math.sin(t * 31 + seed) * 0.5 +
-    Math.sin(t * 73 + seed * 2.3) * 0.3 +
-    Math.sin(t * 157 + seed * 4.1) * 0.2
-  const k = edge === 'fore' ? 0.012 : 0.009
+    Math.sin(t * 31 + seed) * 0.4 +
+    Math.sin(t * 73 + seed * 2.3) * 0.28 +
+    (vnoise(t * 120 + seed * 4.1) - 0.5) * 0.9 + // ragged fibrous edge
+    (vnoise(t * 260 + seed * 1.7) - 0.5) * 0.5
+  const k = edge === 'fore' ? 0.02 : 0.015
   return Math.max(0, (base * 0.5 + 0.5) * k * PAGE_W)
+}
+
+/** Signed distance-ish: how far page point (x,y) sits outside a tear boundary (negative = inside/torn away). */
+export function tearEdgeDistance(profile, x, y) {
+  let best = Infinity
+  for (const tear of profile.tears) {
+    const dx = x - tear.c[0]
+    const dy = y - tear.c[1]
+    let th = Math.atan2(dy, dx)
+    if (th < 0) th += Math.PI * 2
+    if (th < tear.th0 - 0.05 || th > tear.th1 + 0.05) continue
+    const t = Math.min(1, Math.max(0, (th - tear.th0) / (tear.th1 - tear.th0)))
+    const d = Math.hypot(dx, dy) - tear.R(t)
+    if (Math.abs(d) < Math.abs(best)) best = d
+  }
+  return best
+}
+
+/**
+ * Shadow spots for the holes of a torn face, in the static face's LOCAL mesh
+ * coords (x flips for the left page). Rendered just below the face so the
+ * darkness shows through the missing geometry.
+ */
+export function tearShadowSpots(faceIndex, side) {
+  const profile = sheetProfile(Math.floor(faceIndex / 2))
+  const sx = side === 'right' ? 1 : -1
+  return profile.tears.map((tear) => {
+    let rSum = 0
+    for (let i = 0; i <= 8; i++) rSum += tear.R(i / 8)
+    const r = rSum / 9
+    return { x: tear.c[0] * sx, y: tear.c[1], r }
+  })
 }
 
 /** Sample a tear's boundary polyline in page space (for the texture painter). */

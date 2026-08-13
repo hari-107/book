@@ -3,6 +3,12 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { PAGE_W, PAGE_H, EDGE_ZONE } from '../constants.js'
 import { useDoubleTap } from '../utils/doubleTap.js'
+import { shadowBlobTexture } from '../three/proceduralTextures.js'
+
+const tearShadowTex = /* lazy singleton */ (() => {
+  let t = null
+  return () => (t ||= shadowBlobTexture())
+})()
 
 /**
  * A static, readable page face — the top surface of a page stack. Carries
@@ -15,9 +21,10 @@ export function inRect(uv, r) {
   return uv.x >= r.u0 && uv.x <= r.u1 && uv.y >= r.v0 && uv.y <= r.v1
 }
 
-export default function StaticPageFace({ side, texture, regions, z, geometry, onDoubleActivate }) {
+export default function StaticPageFace({ side, texture, regions, z, geometry, tearShadows = [], onDoubleActivate }) {
   const [edgeHover, setEdgeHover] = useState(false)
   const hintRef = useRef()
+  const shadowTex = useMemo(() => (tearShadows.length ? tearShadowTex() : null), [tearShadows.length])
 
   const material = useMemo(
     () => new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0 }),
@@ -61,6 +68,15 @@ export default function StaticPageFace({ side, texture, regions, z, geometry, on
 
   return (
     <group position={[0, 0, z]}>
+      {/* soft shadow seen through each torn hole, on the sheet below */}
+      {shadowTex &&
+        tearShadows.map((s, i) => (
+          <mesh key={i} position={[s.x, s.y, -0.006]} raycast={() => null}>
+            <planeGeometry args={[s.r * 2.1, s.r * 2.1]} />
+            <meshBasicMaterial map={shadowTex} transparent opacity={0.5} depthWrite={false} color="#140b03" />
+          </mesh>
+        ))}
+
       {/* real damaged-paper silhouette — spine-anchored, torn corners missing from the mesh */}
       <mesh
         geometry={geometry}

@@ -33,7 +33,8 @@ function deformFront(geometry, profile) {
     if (y > PAGE_H / 2 - EPS) y -= deckleInset('head', x / PAGE_W, profile.deckleSeed + 31)
     if (y < -PAGE_H / 2 + EPS) y += deckleInset('tail', x / PAGE_W, profile.deckleSeed + 67)
 
-    // dramatic tears: collapse vertices in the torn zone onto the ragged arc
+    // dramatic tears: collapse vertices in the torn zone onto the ragged arc,
+    // and curl the surviving fringe upward like real lifted, peeled paper.
     for (const tear of profile.tears) {
       const dx = x - tear.c[0]
       const dy = y - tear.c[1]
@@ -43,20 +44,33 @@ function deformFront(geometry, profile) {
       if (th < tear.th0 - 0.02 || th > tear.th1 + 0.02) continue
       const t = Math.min(1, Math.max(0, (th - tear.th0) / (tear.th1 - tear.th0)))
       const R = tear.R(t)
+      const ux = d < 1e-6 ? Math.cos((tear.th0 + tear.th1) / 2) : dx / d
+      const uy = d < 1e-6 ? Math.sin((tear.th0 + tear.th1) / 2) : dy / d
       if (d < R) {
-        const ux = d < 1e-6 ? Math.cos((tear.th0 + tear.th1) / 2) : dx / d
-        const uy = d < 1e-6 ? Math.sin((tear.th0 + tear.th1) / 2) : dy / d
-        x = tear.c[0] + ux * R
-        y = tear.c[1] + uy * R
-        z += 0.0022 * Math.sin(t * 37 + profile.deckleSeed) // lifted torn fringe
-      } else if (d < R + 0.04) {
-        z += 0.0012 * Math.sin(t * 41 + profile.deckleSeed) // paper stress near the tear
+        // torn away — snap onto the ragged boundary with a jittered lip
+        const lip = 1 + 0.03 * Math.sin(t * 120 + tear.seed * 9)
+        x = tear.c[0] + ux * R * lip
+        y = tear.c[1] + uy * R * lip
+        z += 0.006 * (0.6 + 0.4 * Math.sin(t * 47 + profile.deckleSeed)) // raised curled lip
+      } else {
+        // surviving paper near the rip curls up, peaking ~5mm in from the edge
+        const band = 0.11 * PAGE_W
+        const inset = d - R
+        if (inset < band) {
+          const g = 1 - inset / band // 1 at the edge → 0 at band's inner limit
+          const curl = Math.sin(g * Math.PI * 0.5)
+          z += 0.03 * curl * curl * (0.75 + 0.25 * Math.sin(t * 60 + tear.seed * 3))
+          // slight pull-back toward the tear as it lifts (paper foreshortens when it curls)
+          x -= ux * 0.012 * curl
+          y -= uy * 0.012 * curl
+        }
       }
     }
 
     pos.setXYZ(i, x, y, z)
   }
   pos.needsUpdate = true
+  geometry.computeVertexNormals() // so the curled fringe catches light
   geometry.computeBoundingSphere()
   return geometry
 }
@@ -74,12 +88,10 @@ function mirrorGeometry(front) {
     index[i + 1] = index[i + 2]
     index[i + 2] = tmp
   }
-  const normal = g.attributes.normal
-  for (let i = 0; i < normal.count; i++) normal.setXYZ(i, 0, 0, 1)
   pos.needsUpdate = true
   uv.needsUpdate = true
   g.index.needsUpdate = true
-  normal.needsUpdate = true
+  g.computeVertexNormals() // keep the curl shading after mirroring
   g.computeBoundingSphere()
   return g
 }
