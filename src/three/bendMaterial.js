@@ -36,10 +36,12 @@ const BEND_MATH = /* glsl */ `
   float bendC = cos(bendA);
 `
 
-export function createBendMaterial({ map, uniforms, backSide = false }) {
+export function createBendMaterial({ map, normalMap = null, uniforms, backSide = false }) {
   const material = new THREE.MeshStandardMaterial({
     map,
-    roughness: 0.82,
+    normalMap,
+    normalScale: new THREE.Vector2(0.7, 0.7),
+    roughness: 0.94,
     metalness: 0,
     side: backSide ? THREE.BackSide : THREE.FrontSide,
   })

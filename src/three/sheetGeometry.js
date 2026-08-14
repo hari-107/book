@@ -33,6 +33,20 @@ function deformFront(geometry, profile) {
     if (y > PAGE_H / 2 - EPS) y -= deckleInset('head', x / PAGE_W, profile.deckleSeed + 31)
     if (y < -PAGE_H / 2 + EPS) y += deckleInset('tail', x / PAGE_W, profile.deckleSeed + 67)
 
+    // paper is never flat: gentle positive undulation, bound at the spine
+    // and freest at the fore-edge, plus a soft swell where the sheet rolls
+    // into the binding. Positive-only so resting sheets never sink into the
+    // stack beneath them.
+    {
+      const nx0 = Math.max(0, x / PAGE_W)
+      const wave =
+        ((Math.sin(x * 6.1 + profile.deckleSeed * 2.1) * Math.sin(y * 4.6 + profile.deckleSeed) + 1) * 0.5) *
+        0.0055 *
+        Math.pow(nx0, 1.5)
+      const gutterSwell = 0.008 * Math.exp(-nx0 * 7)
+      z += wave + gutterSwell
+    }
+
     // dramatic tears: collapse vertices in the torn zone onto the ragged arc,
     // and curl the surviving fringe upward like real lifted, peeled paper.
     for (const tear of profile.tears) {

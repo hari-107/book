@@ -106,7 +106,10 @@ export default function Book() {
 
   useEffect(
     () => () => {
-      faceRender.forEach((fr) => fr.texture.dispose())
+      faceRender.forEach((fr) => {
+        fr.texture.dispose()
+        fr.normalTexture && fr.normalTexture.dispose()
+      })
       mirrored.forEach((t) => t && t.dispose())
       endpaperMat.map.dispose()
       endpaperMat.dispose()
@@ -176,6 +179,7 @@ export default function Book() {
       const mats = sheetMaterialsRef.current
       if (mats) {
         mats.front.map = faceRender[2 * sheet].texture
+        mats.front.normalMap = faceRender[2 * sheet].normalTexture
         mats.back.map = mirrored[2 * sheet + 1]
       }
       uniforms.uCurlDir.value = dir
@@ -414,6 +418,7 @@ export default function Book() {
               <StaticPageFace
                 side="left"
                 texture={faceRender[leftFaceIdx].texture}
+                normalTexture={faceRender[leftFaceIdx].normalTexture}
                 regions={faceRender[leftFaceIdx].regions}
                 geometry={sheetGeoms[Math.floor(leftFaceIdx / 2)].left}
                 tearShadows={tearShadowSpots(leftFaceIdx, 'left')}
@@ -425,6 +430,7 @@ export default function Book() {
               <StaticPageFace
                 side="right"
                 texture={faceRender[rightFaceIdx].texture}
+                normalTexture={faceRender[rightFaceIdx].normalTexture}
                 regions={faceRender[rightFaceIdx].regions}
                 geometry={sheetGeoms[Math.floor(rightFaceIdx / 2)].front}
                 tearShadows={tearShadowSpots(rightFaceIdx, 'right')}
@@ -444,6 +450,7 @@ export default function Book() {
               uniforms={uniforms}
               materialsRef={sheetMaterialsRef}
               geometry={sheetGeoms[turn ? turn.sheet : 0].front}
+              initialNormalMap={faceRender[0].normalTexture}
             />
 
             <FrontCover

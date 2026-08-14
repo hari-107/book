@@ -64,7 +64,7 @@ function upscaleNoise(ctx, W2, H2, cellsX, cellsY, tone, maxAlpha, rand = Math.r
   ctx.restore()
 }
 
-function sobelNormalFromCanvas(heightCanvas, strength = 2.4) {
+export function sobelNormalFromCanvas(heightCanvas, strength = 2.4) {
   const w = heightCanvas.width
   const h = heightCanvas.height
   const src = heightCanvas.getContext('2d').getImageData(0, 0, w, h).data

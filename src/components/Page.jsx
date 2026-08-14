@@ -21,16 +21,22 @@ export function inRect(uv, r) {
   return uv.x >= r.u0 && uv.x <= r.u1 && uv.y >= r.v0 && uv.y <= r.v1
 }
 
-export default function StaticPageFace({ side, texture, regions, z, geometry, tearShadows = [], onDoubleActivate }) {
+export default function StaticPageFace({ side, texture, normalTexture, regions, z, geometry, tearShadows = [], onDoubleActivate }) {
   const [edgeHover, setEdgeHover] = useState(false)
   const hintRef = useRef()
   const shadowTex = useMemo(() => (tearShadows.length ? tearShadowTex() : null), [tearShadows.length])
 
   const material = useMemo(
-    () => new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0 }),
+    () =>
+      new THREE.MeshStandardMaterial({
+        roughness: 0.94, // paper is matte
+        metalness: 0,
+        normalScale: new THREE.Vector2(0.7, 0.7),
+      }),
     []
   )
   material.map = texture
+  material.normalMap = normalTexture || null
 
   const inEdgeZone = (uv) => (side === 'right' ? uv.x > 1 - EDGE_ZONE : uv.x < EDGE_ZONE)
 

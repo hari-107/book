@@ -6,6 +6,7 @@ import {
 import { PLACEHOLDER_PREFIX, bookMeta } from '../data/bookContent.js'
 import { drawIndexBody } from '../components/IndexPage.js'
 import { sheetProfile, sampleTearBoundary } from './tearProfiles.js'
+import { sobelNormalFromCanvas } from './proceduralTextures.js'
 
 /**
  * Prints one page face of the adventure book to a CanvasTexture.
@@ -113,7 +114,7 @@ function cloudLayer(ctx, rnd, cellsX, cellsY, maxAlpha, tone = [150, 118, 66]) {
   ctx.restore()
 }
 
-function paintParchment(ctx, side, rnd) {
+function paintParchment(ctx, side, rnd, relief = { creases: [], cracks: [], stains: [], tides: [], folds: [] }) {
   // base — pale aged ivory (reference photo tone): near-cream center,
   // aging lives in the clouds, creases and edges, not a uniform yellow.
   const grad = ctx.createRadialGradient(W * (0.42 + rnd() * 0.16), H * (0.35 + rnd() * 0.2), H * 0.2, W / 2, H / 2, H * 0.8)
@@ -135,6 +136,7 @@ function paintParchment(ctx, side, rnd) {
   for (let s = 0; s < stainCount; s++) {
     const cx = rnd() > 0.5 ? W * (0.6 + rnd() * 0.35) : W * (0.05 + rnd() * 0.3)
     const cy = H * (0.05 + rnd() * 0.5)
+    relief.stains.push({ x: cx, y: cy, r: 180 + rnd() * 120 })
     for (let i = 0; i < 7; i++) {
       const x = cx + (rnd() - 0.5) * 220
       const y = cy + (rnd() - 0.5) * 260
@@ -151,14 +153,17 @@ function paintParchment(ctx, side, rnd) {
     ctx.beginPath()
     const rr = 140 + rnd() * 90
     const a0 = rnd() * Math.PI * 2
+    const tidePts = []
     for (let i = 0; i <= 26; i++) {
       const a = a0 + (i / 26) * Math.PI * (1.1 + rnd() * 0.6)
       const r = rr * (0.82 + rnd() * 0.36)
       const px = cx + Math.cos(a) * r
       const py = cy + Math.sin(a) * r * 0.8
+      tidePts.push([px, py])
       i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)
     }
     ctx.stroke()
+    relief.tides.push(tidePts)
   }
 
   // paper fibers
@@ -264,16 +269,20 @@ function paintParchment(ctx, side, rnd) {
     const pts = creasePath(x0, y0, x1, y1)
     const strength = 0.55 + rnd() * 0.45
     strokeCrease(pts, strength)
+    relief.creases.push({ pts, strength })
     // branch from a midpoint
     if (rnd() > 0.55) {
       const [bx, by] = pts[Math.floor(pts.length / 2)]
-      strokeCrease(creasePath(bx, by, bx + (rnd() - 0.5) * 500, by + (rnd() - 0.5) * 420), strength * 0.7)
+      const bpts = creasePath(bx, by, bx + (rnd() - 0.5) * 500, by + (rnd() - 0.5) * 420)
+      strokeCrease(bpts, strength * 0.7)
+      relief.creases.push({ pts: bpts, strength: strength * 0.7 })
     }
   }
   // a couple of sharp hairline cracks
   for (let i = 0; i < 2; i++) {
     const [x0, y0] = edgePoint()
     const pts = creasePath(x0, y0, W * (0.25 + rnd() * 0.5), H * (0.25 + rnd() * 0.5))
+    relief.cracks.push(pts)
     ctx.strokeStyle = 'rgba(255,252,244,0.5)'
     ctx.lineWidth = 1
     ctx.beginPath()
@@ -466,7 +475,7 @@ function fingerprint(ctx, rnd, x, y, scale = 1, alpha = 0.07) {
   ctx.restore()
 }
 
-function foldedCorner(ctx, rnd, corner, side) {
+function foldedCorner(ctx, rnd, corner, side, relief) {
   // a dog-eared fore-edge corner, drawn as light + shadow.
   // The fore-edge sits at canvas-right on right pages, canvas-left on left pages.
   const s = 70 + rnd() * 60
@@ -475,6 +484,7 @@ function foldedCorner(ctx, rnd, corner, side) {
   const sy = top ? 1 : -1
   const fx = side === 'right' ? W : 0
   const sx = side === 'right' ? -1 : 1 // direction from fore-edge into the page
+  if (relief) relief.folds.push({ fx, cy, sx, sy, s })
   ctx.save()
   // shadow under the fold
   ctx.fillStyle = 'rgba(60,40,16,0.3)'
@@ -1321,6 +1331,117 @@ function drawBlocks(ctx, rnd, blocks, y) {
   return y
 }
 
+/**
+ * Paper relief → normal map. A half-resolution height field is built from
+ * the SAME relief features the color pass painted (creases, tide lines,
+ * folds, stains, tears, deckled borders) plus fine paper tooth, then run
+ * through a sobel filter. Under the scene's raking key light the ridges,
+ * cockling and grain genuinely catch light — paper you can feel.
+ */
+const HW = 512
+const HH = Math.round((H / W) * 512)
+const HS = HW / W
+
+function buildHeightCanvas(face, side, relief, rnd) {
+  const c = document.createElement('canvas')
+  c.width = HW
+  c.height = HH
+  const hctx = c.getContext('2d')
+  hctx.fillStyle = '#808080'
+  hctx.fillRect(0, 0, HW, HH)
+
+  // paper tooth — fine grain
+  const img = hctx.getImageData(0, 0, HW, HH)
+  const d = img.data
+  for (let i = 0; i < d.length; i += 4) {
+    const g = (rnd() - 0.5) * 26
+    d[i] += g
+    d[i + 1] += g
+    d[i + 2] += g
+  }
+  hctx.putImageData(img, 0, 0)
+
+  const poly = (pts, style, width, offX = 0, offY = 0) => {
+    hctx.strokeStyle = style
+    hctx.lineWidth = width
+    hctx.lineCap = 'round'
+    hctx.lineJoin = 'round'
+    hctx.beginPath()
+    pts.forEach(([x, y], i) => {
+      const px = x * HS + offX
+      const py = y * HS + offY
+      i === 0 ? hctx.moveTo(px, py) : hctx.lineTo(px, py)
+    })
+    hctx.stroke()
+  }
+
+  // cockling: stains swell and dish the paper
+  for (const st of relief.stains) {
+    const g = hctx.createRadialGradient(st.x * HS, st.y * HS, 2, st.x * HS, st.y * HS, st.r * HS)
+    g.addColorStop(0, 'rgba(0,0,0,0.16)')
+    g.addColorStop(0.7, 'rgba(255,255,255,0.08)')
+    g.addColorStop(1, 'rgba(255,255,255,0)')
+    hctx.fillStyle = g
+    hctx.fillRect(0, 0, HW, HH)
+  }
+  for (const pts of relief.tides) poly(pts, 'rgba(255,255,255,0.35)', 2)
+
+  // creases: bright ridge + dark valley alongside
+  for (const cr of relief.creases) {
+    poly(cr.pts, `rgba(0,0,0,${(0.4 * cr.strength).toFixed(3)})`, 6, 2.2, 2.2)
+    poly(cr.pts, `rgba(255,255,255,${(0.75 * cr.strength).toFixed(3)})`, 2)
+  }
+  for (const pts of relief.cracks) poly(pts, 'rgba(255,255,255,0.6)', 1.2)
+
+  // dog-eared folds: raised flap
+  for (const f of relief.folds) {
+    hctx.fillStyle = 'rgba(255,255,255,0.55)'
+    hctx.beginPath()
+    hctx.moveTo((f.fx + f.sx * f.s) * HS, f.cy * HS)
+    hctx.lineTo(f.fx * HS, (f.cy + f.sy * f.s) * HS)
+    hctx.lineTo((f.fx + f.sx * f.s * 0.94) * HS, (f.cy + f.sy * f.s * 0.9) * HS)
+    hctx.closePath()
+    hctx.fill()
+    hctx.strokeStyle = 'rgba(0,0,0,0.5)'
+    hctx.lineWidth = 2
+    hctx.beginPath()
+    hctx.moveTo((f.fx + f.sx * f.s) * HS, f.cy * HS)
+    hctx.lineTo(f.fx * HS, (f.cy + f.sy * f.s) * HS)
+    hctx.stroke()
+  }
+
+  // torn lips lift — pageToCanvas gives full-res coords; scale into the height canvas
+  const profile = sheetProfile(Math.floor(face.faceIndex / 2))
+  for (const tear of profile.tears) {
+    const pts = sampleTearBoundary(tear, 80).map(([x, y]) => pageToCanvas(x, y, side))
+    hctx.strokeStyle = 'rgba(255,255,255,0.7)'
+    hctx.lineWidth = 3
+    hctx.beginPath()
+    pts.forEach(([X, Y], i) => (i === 0 ? hctx.moveTo(X * HS, Y * HS) : hctx.lineTo(X * HS, Y * HS)))
+    hctx.stroke()
+    hctx.strokeStyle = 'rgba(0,0,0,0.35)'
+    hctx.lineWidth = 5
+    hctx.beginPath()
+    pts.forEach(([X, Y], i) => (i === 0 ? hctx.moveTo(X * HS + 3, Y * HS + 3) : hctx.lineTo(X * HS + 3, Y * HS + 3)))
+    hctx.stroke()
+  }
+
+  // thin worn borders
+  const border = (x0, y0, x1, y1) => {
+    const g = hctx.createLinearGradient(x0, y0, x1, y1)
+    g.addColorStop(0, 'rgba(0,0,0,0.45)')
+    g.addColorStop(1, 'rgba(0,0,0,0)')
+    hctx.fillStyle = g
+    hctx.fillRect(0, 0, HW, HH)
+  }
+  border(0, 0, HW * 0.03, 0)
+  border(HW, 0, HW * 0.97, 0)
+  border(0, 0, 0, HH * 0.025)
+  border(0, HH, 0, HH * 0.975)
+
+  return c
+}
+
 // ---- entry points ---------------------------------------------------------------
 export function renderPageFace(face, side) {
   const canvas = document.createElement('canvas')
@@ -1329,8 +1450,9 @@ export function renderPageFace(face, side) {
   const ctx = canvas.getContext('2d')
   const rnd = mulberry32(seedFrom(face.id))
   const regions = []
+  const relief = { creases: [], cracks: [], stains: [], tides: [], folds: [] }
 
-  paintParchment(ctx, side, rnd)
+  paintParchment(ctx, side, rnd, relief)
 
   // occasional stains — same physical world on every page
   if (rnd() > 0.55) coffeeRing(ctx, rnd, MARGIN + rnd() * (W - 2 * MARGIN), 200 + rnd() * (H - 500), 46 + rnd() * 40)
@@ -1340,7 +1462,7 @@ export function renderPageFace(face, side) {
   if (rnd() > 0.78) burnMark(ctx, rnd, rnd() > 0.5 ? W * 0.06 + rnd() * 40 : W * 0.94 - rnd() * 40, H * (0.2 + rnd() * 0.6), 18 + rnd() * 26)
 
   const hasTear = sheetProfile(Math.floor(face.faceIndex / 2)).tears.length > 0
-  if (!hasTear && rnd() > 0.72) foldedCorner(ctx, rnd, rnd() > 0.5 ? 'tr' : 'br', side)
+  if (!hasTear && rnd() > 0.72) foldedCorner(ctx, rnd, rnd() > 0.5 ? 'tr' : 'br', side, relief)
 
   if (face.kind !== 'blank') {
     if (face.theme === 'title') {
@@ -1368,7 +1490,13 @@ export function renderPageFace(face, side) {
   const texture = new THREE.CanvasTexture(canvas)
   texture.colorSpace = THREE.SRGBColorSpace
   texture.anisotropy = 8
-  return { texture, regions }
+
+  // relief → normal map so the paper surface catches the light
+  const heightCanvas = buildHeightCanvas(face, side, relief, rnd)
+  const normalTexture = new THREE.CanvasTexture(sobelNormalFromCanvas(heightCanvas, 3.0))
+  normalTexture.anisotropy = 4
+
+  return { texture, normalTexture, regions }
 }
 
 /** Plain endpaper (inside of a cover) — same aged stock, no content. */

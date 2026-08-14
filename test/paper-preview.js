@@ -30,21 +30,19 @@ async function main() {
     /* proceed with fallbacks */
   }
 
+  // paper relief first (above the fold): torn face color + its normal map
+  const f4 = renderPageFace(FACES[4], 'right')
+  add(f4.texture.image, 'face 4 color — about-2 (torn)')
+  add(f4.normalTexture.image, 'face 4 — paper relief normals')
+
+  const f2 = renderPageFace(FACES[2], 'right')
+  add(f2.texture.image, 'face 2 — index')
+
   // the embossed front-cover leather (color map) + its normal map
   const leather = agedLeatherMaps({ emboss: true, owner: bookMeta.owner, title: bookMeta.title })
   add(leather.map.image, 'front cover leather — color', true)
   add(leather.normalMap.image, 'front cover leather — normals', true)
 
-  // face 4 = sheet 2 front (torn corner, right page) · face 5 = its back (left)
-  const picks = [
-    [4, 'right'],
-    [5, 'left'],
-    [2, 'right'],
-  ]
-  for (const [idx, side] of picks) {
-    const { texture } = renderPageFace(FACES[idx], side)
-    add(texture.image, `face ${idx} (${side}) — ${FACES[idx].id}`)
-  }
   document.getElementById('status').textContent = 'rendered ✓'
 }
 main()

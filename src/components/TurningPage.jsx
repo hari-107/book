@@ -9,12 +9,15 @@ import { createBendMaterial } from '../three/bendMaterial.js'
  * and geometry are swapped per turn (uniform/geometry updates, no shader
  * recompile).
  */
-const TurningPage = forwardRef(function TurningPage({ uniforms, materialsRef, geometry }, ref) {
+const TurningPage = forwardRef(function TurningPage({ uniforms, materialsRef, geometry, initialNormalMap = null }, ref) {
   const materials = useMemo(
     () => ({
-      front: createBendMaterial({ map: null, uniforms }),
+      // front gets a normal map (swapped per turn); the underside relies on
+      // curvature + motion, keeping the shader define stable
+      front: createBendMaterial({ map: null, normalMap: initialNormalMap, uniforms }),
       back: createBendMaterial({ map: null, uniforms, backSide: true }),
     }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [uniforms]
   )
 
