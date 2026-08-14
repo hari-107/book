@@ -204,6 +204,18 @@ export default function Book() {
     [faceRender, mirrored, uniforms]
   )
 
+  /** A small physical reaction — the book flinches when poked. */
+  const nudge = useCallback((strength = 1) => {
+    const g = nudgeRef.current
+    if (!g) return
+    gsap.killTweensOf(g.rotation)
+    gsap.killTweensOf(g.position)
+    g.rotation.z = 0.012 * strength * (Math.random() > 0.5 ? 1 : -1)
+    g.position.y = -0.015 * strength
+    gsap.to(g.rotation, { z: 0, duration: 0.7, ease: 'elastic.out(1.4, 0.28)' })
+    gsap.to(g.position, { y: 0, duration: 0.6, ease: 'elastic.out(1.4, 0.3)' })
+  }, [])
+
   const openBook = useCallback(() => {
     const s = useBookStore.getState()
     if (s.isOpen || s.opening || s.closing) return
@@ -388,18 +400,6 @@ export default function Book() {
       }
     }
   })
-
-  /** A small physical reaction — the book flinches when poked. */
-  const nudge = useCallback((strength = 1) => {
-    const g = nudgeRef.current
-    if (!g) return
-    gsap.killTweensOf(g.rotation)
-    gsap.killTweensOf(g.position)
-    g.rotation.z = 0.012 * strength * (Math.random() > 0.5 ? 1 : -1)
-    g.position.y = -0.015 * strength
-    gsap.to(g.rotation, { z: 0, duration: 0.7, ease: 'elastic.out(1.4, 0.28)' })
-    gsap.to(g.position, { y: 0, duration: 0.6, ease: 'elastic.out(1.4, 0.3)' })
-  }, [])
 
   // ---- interaction handlers --------------------------------------------
   const bodyDouble = useCallback(() => {

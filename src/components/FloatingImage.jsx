@@ -251,6 +251,11 @@ export default function FloatingImage({ img, slot, hidden, leaving, seed }) {
     d.active = true
     d.tx = g.position.x
     d.ty = g.position.y
+    // remember where the print was lifted from, in case the reader bails (Esc)
+    d.ox = g.position.x
+    d.oy = g.position.y
+    d.oz = g.position.z
+    d.orot = g.rotation.z
     setDraggingState(true)
     useBookStore.getState().setPhotoDrag(true)
     gsap.killTweensOf(g.position)
@@ -258,6 +263,23 @@ export default function FloatingImage({ img, slot, hidden, leaving, seed }) {
     gsap.to(g.position, { z: 0.62, duration: 0.18, ease: 'power2.out' }) // lift off the parchment
     document.body.style.cursor = 'grabbing'
     sfx('tick')
+  }
+
+  /** Esc mid-drag: the print floats back to exactly where it was picked up. */
+  const cancelDrag = () => {
+    const d = drag.current
+    const g = groupRef.current
+    d.pending = false
+    if (!d.active || !g) return
+    d.active = false
+    setDraggingState(false)
+    useBookStore.getState().setPhotoDrag(false)
+    gsap.killTweensOf(g.position)
+    gsap.killTweensOf(g.rotation)
+    gsap.to(g.position, { x: d.ox, y: d.oy, z: d.oz, duration: 0.45, ease: 'power3.out' })
+    gsap.to(g.rotation, { x: 0, y: 0, z: d.orot, duration: 0.45, ease: 'power2.out' })
+    gsap.delayedCall(0.4, () => sfx('slap'))
+    document.body.style.cursor = 'auto'
   }
 
   const endDrag = () => {
@@ -288,13 +310,18 @@ export default function FloatingImage({ img, slot, hidden, leaving, seed }) {
       }
     }
     const up = () => endDrag()
+    const key = (e) => {
+      if (e.key === 'Escape' && drag.current.active) cancelDrag()
+    }
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', up)
     window.addEventListener('pointercancel', up)
+    window.addEventListener('keydown', key)
     return () => {
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', up)
       window.removeEventListener('pointercancel', up)
+      window.removeEventListener('keydown', key)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -394,10 +421,15 @@ export default function FloatingImage({ img, slot, hidden, leaving, seed }) {
         <mesh material={materials.shadow} position={[0.02, -0.03, -0.02]} raycast={() => null}>
           <planeGeometry args={[imgW * 1.45, imgH * 1.5]} />
         </mesh>
-        {/* aged polaroid backing for real photos (placeholders draw their own) */}
-        {isReal && (
-          <mesh material={materials.frame} position={[0, -0.035, -0.004]}>
-            <planeGeometry args={[imgW + 0.06, imgH + 0.14]} />
+        {/* card-stock body — every print is a physical object with real
+            thickness; its pale paper edge catches light when lifted */}
+        {isReal ? (
+          <mesh material={materials.frame} position={[0, -0.035, -0.006]}>
+            <boxGeometry args={[imgW + 0.06, imgH + 0.14, 0.008]} />
+          </mesh>
+        ) : (
+          <mesh material={materials.frame} position={[0, 0, -0.006]}>
+            <boxGeometry args={[imgW * 0.985, imgH * 0.985, 0.008]} />
           </mesh>
         )}
         <mesh

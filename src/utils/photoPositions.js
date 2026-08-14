@@ -10,5 +10,7 @@ export const photoPositions = new Map()
 let releaseCounter = 0
 export function nextTopOffset() {
   releaseCounter += 1
-  return (releaseCounter % 10) * 0.006
+  // long cycle + small step: the most recently handled print reads as the
+  // top of the pile for dozens of interactions before the stack rebases
+  return (releaseCounter % 40) * 0.0035
 }

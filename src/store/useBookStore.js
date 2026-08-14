@@ -6,6 +6,17 @@ import { create } from 'zustand'
  * (opening, turning, jumping) so keyboard / navigation / index handlers can
  * trigger them without prop-drilling.
  */
+// Hidden deep link: opening /#spread=N makes the book open straight to that
+// spread (it riffles there physically, same as the close/reopen memory).
+const initialSpread = (() => {
+  try {
+    const m = /spread=(\d+)/.exec(window.location.hash)
+    return m ? Math.max(0, parseInt(m[1], 10)) : 0
+  } catch {
+    return 0
+  }
+})()
+
 export const useBookStore = create((set, get) => ({
   // Lifecycle
   phase: 'loading', // 'loading' | 'ready'
@@ -16,7 +27,7 @@ export const useBookStore = create((set, get) => ({
   opening: false,
   closing: false,
   spread: 0, // number of sheets turned (0..SHEET_COUNT)
-  lastSpread: 0, // remembered across close/reopen
+  lastSpread: initialSpread, // remembered across close/reopen (seeded by #spread=N)
   turning: false,
 
   // A photograph is being dragged — photo interaction takes priority

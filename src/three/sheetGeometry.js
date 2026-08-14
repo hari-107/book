@@ -113,7 +113,9 @@ function mirrorGeometry(front) {
 export function buildSheetGeometries() {
   const sheets = []
   for (let j = 0; j < SHEET_COUNT; j++) {
-    const base = new THREE.PlaneGeometry(PAGE_W, PAGE_H, 72, 10)
+    // dense enough vertically that interior holes and bottom bites read as
+    // genuinely ragged silhouettes rather than chunky notches
+    const base = new THREE.PlaneGeometry(PAGE_W, PAGE_H, 72, 24)
     base.translate(PAGE_W / 2, 0, 0) // hinge at the spine (x = 0)
     const front = deformFront(base, sheetProfile(j))
     sheets.push({ front, left: mirrorGeometry(front) })

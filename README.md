@@ -12,12 +12,14 @@ in-flight flutter), not a physics engine and not a CSS flip. All textures —
 worn leather, aged parchment, stains, doodles, stamps, gears, paper scraps —
 are generated procedurally at runtime; the repo ships zero binary assets.
 
-**The damage is real geometry.** Every sheet has deckled (irregular) edges,
-and designated sheets carry genuine corner tears and edge bites: the torn
-region is missing from the mesh silhouette itself (raycasts pass through it,
-the sheet below shows through), with a lifted fiber fringe and painted paper
-thickness along the rip — on the resting page AND while that same sheet
-turns. Photos, taped documents and the coin artifact float physically above
+**The damage is real geometry — and it progresses.** Every sheet has deckled
+(irregular) edges, and the journal wears out front to back: the title and
+index are presentable, the middle picks up torn corners, ripped fore-edges
+and bites, and the last third carries double tears, genuine holes punched
+through the middle of the page and scorched fore-edges. A torn region is
+missing from the mesh silhouette itself (raycasts pass through it, the sheet
+below shows through), with a lifted fiber fringe and painted paper thickness
+along the rip — on the resting page AND while that same sheet turns. Photos, taped documents and the coin artifact float physically above
 the parchment and cast soft drop shadows onto it. The book rests on an
 explorer's desk: maps, letters, compass, magnifying glass, ink bottle,
 pencils, coins, and a candle whose light actually flickers.
@@ -59,7 +61,8 @@ Requires Node.js 18+.
 | `→` / `←` | Next / previous page |
 | `R` | Reset orientation and zoom |
 | `M` | Mute the paper (all sounds are synthesized WebAudio foley — no audio files) |
-| `Esc` | Release a focused photo, then close the map |
+| `Esc` | Cancel a drag (the print floats back), release a focused photo, then close the map |
+| `/#spread=N` in the URL | The book opens straight to spread N (it riffles there physically) |
 | Click the **compass** on the About pages | The needle spins |
 | Click a **section stamp** | It stamps itself again |
 | A certain button that says **DO NOT PRESS** | Absolutely nothing. Definitely don't try it |

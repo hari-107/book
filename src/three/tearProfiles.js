@@ -82,20 +82,70 @@ function foreEdgeRip(y, r, seed) {
   return { c: [PAGE_W, y * PAGE_H], th0: Math.PI * 0.5, th1: Math.PI * 1.5, R, seed }
 }
 
+/**
+ * An irregular hole punched INSIDE the page (not touching any edge). The
+ * boundary is a closed ragged loop; radii are blended near the closure so
+ * the loop meets itself without a step. The mesh vertices inside collapse
+ * onto the loop, so light and raycasts genuinely pass through the paper.
+ */
+function interiorHole(x, y, r, seed) {
+  const rr = r * PAGE_W
+  const raw = (t) => rr * raggedFactor(t, 11 + seed * 13)
+  const R = (t) => {
+    if (t > 0.88) {
+      const k = (t - 0.88) / 0.12 // blend the loop closed
+      return raw(t) * (1 - k) + raw(0) * k
+    }
+    return raw(t)
+  }
+  return { c: [x * PAGE_W, y * PAGE_H], th0: 0, th1: Math.PI * 2, R, seed, hole: true }
+}
+
 const profileCache = new Map()
 
-/** Damage profile for sheet j — deterministic, cached. */
+/**
+ * Damage profile for sheet j — deterministic, cached.
+ *
+ * PROGRESSIVE DAMAGE: the journal has been used front to back, and its back
+ * half has clearly been through something. Early sheets are presentable —
+ * lightly stained, deckled but whole. The middle picks up torn corners and
+ * ripped edges. The last third carries large tears, bites, genuine holes and
+ * scorched fore-edges — heavily worn parchment, missing pieces and all.
+ */
 export function sheetProfile(j) {
   if (profileCache.has(j)) return profileCache.get(j)
   const rnd = mulberry32(j * 7919 + 13)
   const deckleSeed = rnd() * 100
   const tears = []
-  if (j === 2) tears.push(cornerTear('tr', 0.2, rnd()))
-  if (j === 3) tears.push(foreEdgeRip(0.08, 0.13, rnd())) // ripped outer edge
-  if (j === 5) tears.push(cornerTear('br', 0.24, rnd()))
+  let scorch = false
+  // — early sheets (cover, title, index): clean, only deckling and stains —
+  if (j === 2) tears.push(cornerTear('tr', 0.2, rnd())) // about: first torn corner
+  if (j === 3) tears.push(foreEdgeRip(0.08, 0.13, rnd())) // skills: ripped outer edge
+  if (j === 4) tears.push(bottomBite(0.62, 0.09, rnd())) // experience: a small bite
+  if (j === 5) tears.push(cornerTear('br', 0.24, rnd())) // projects: torn corner
   if (j === 6) tears.push(cornerTear('br', 0.42, rnd())) // huge diagonal tear
-  if (j === 10) tears.push(bottomBite(0.48, 0.13, rnd()))
-  const profile = { deckleSeed, tears }
+  // — the back half: things went badly on that expedition —
+  if (j === 7) tears.push(interiorHole(0.55, 0.12, 0.1, rnd())) // a real hole
+  if (j === 8) {
+    tears.push(foreEdgeRip(0.05, 0.17, rnd())) // field reports: ripped open
+    tears.push(cornerTear('tr', 0.13, rnd()))
+  }
+  if (j === 9) tears.push(bottomBite(0.44, 0.16, rnd()))
+  if (j === 10) {
+    tears.push(bottomBite(0.52, 0.19, rnd())) // fun zone: chewed
+    tears.push(cornerTear('tr', 0.26, rnd()))
+  }
+  if (j === 11) {
+    tears.push(foreEdgeRip(-0.12, 0.2, rnd())) // contact: barely holding on
+    tears.push(cornerTear('br', 0.18, rnd()))
+    scorch = true // singed fore-edge
+  }
+  if (j === 12) {
+    tears.push(cornerTear('br', 0.5, rnd())) // the end: a chunk is simply gone
+    tears.push(interiorHole(0.42, 0.28, 0.085, rnd()))
+    scorch = true
+  }
+  const profile = { deckleSeed, tears, scorch }
   profileCache.set(j, profile)
   return profile
 }

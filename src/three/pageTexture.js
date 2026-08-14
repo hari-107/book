@@ -538,8 +538,17 @@ function pageToCanvas(x, y, side) {
  * inner fiber band, a bright jagged paper-core lip that catches light, and
  * hair-fine fibers straggling past the edge into the missing region.
  */
+const TEAR_NOTES = [
+  'this part is lost to history…',
+  'casualty of the expedition',
+  'the rats got this bit',
+  'do not ask about this hole',
+  'it was like this when I found it',
+]
+
 function paintTears(ctx, face, side, rnd) {
   const profile = sheetProfile(Math.floor(face.faceIndex / 2))
+  let annotated = false
   for (const tear of profile.tears) {
     const bpts = sampleTearBoundary(tear, 150) // page space
     const pts = bpts.map(([x, y]) => pageToCanvas(x, y, side))
@@ -619,9 +628,49 @@ function paintTears(ctx, face, side, rnd) {
     }
     ctx.restore()
 
-    // a note that carries on across the tear
-    const [mx, my] = pts[Math.floor(pts.length / 2)]
-    annotation(ctx, rnd, 'this part is lost to history…', mx + (side === 'right' ? -140 : 140), my + 66, -0.08, 27)
+    // a note that carries on beside the damage — once per face, never twice
+    if (!annotated) {
+      annotated = true
+      const [mx, my] = pts[Math.floor(pts.length / 2)]
+      const note = TEAR_NOTES[Math.floor(rnd() * TEAR_NOTES.length)]
+      annotation(ctx, rnd, note, mx + (side === 'right' ? -140 : 140), my + 66, -0.08, 27)
+    }
+  }
+
+  // scorched fore-edge on sheets that met the candle — charred rim, ember
+  // browning bleeding inward, soot flecks. Painted last so it sits over ink.
+  if (profile.scorch) {
+    const edgeX = side === 'right' ? W : 0
+    const dir = side === 'right' ? -1 : 1
+    ctx.save()
+    // browned band bleeding in from the fore-edge
+    const g = ctx.createLinearGradient(edgeX, 0, edgeX + dir * 150, 0)
+    g.addColorStop(0, 'rgba(38,22,8,0.75)')
+    g.addColorStop(0.35, 'rgba(74,40,14,0.4)')
+    g.addColorStop(0.75, 'rgba(120,70,26,0.16)')
+    g.addColorStop(1, 'rgba(120,70,26,0)')
+    ctx.fillStyle = g
+    ctx.fillRect(side === 'right' ? W - 150 : 0, 0, 150, H)
+    // irregular charred blotches hugging the edge
+    for (let i = 0; i < 26; i++) {
+      const y = rnd() * H
+      const r = 8 + rnd() * 30
+      const x = edgeX + dir * rnd() * 34
+      const bg = ctx.createRadialGradient(x, y, 1, x, y, r)
+      bg.addColorStop(0, `rgba(16,10,5,${(0.35 + rnd() * 0.4).toFixed(2)})`)
+      bg.addColorStop(1, 'rgba(16,10,5,0)')
+      ctx.fillStyle = bg
+      ctx.beginPath()
+      ctx.arc(x, y, r, 0, Math.PI * 2)
+      ctx.fill()
+    }
+    // soot flecks drifting further in
+    for (let i = 0; i < 60; i++) {
+      ctx.fillStyle = `rgba(30,20,10,${(0.1 + rnd() * 0.3).toFixed(2)})`
+      const y = rnd() * H
+      ctx.fillRect(edgeX + dir * (rnd() * rnd() * 210), y, 1.6 + rnd() * 2.4, 1.2 + rnd() * 2)
+    }
+    ctx.restore()
   }
 }
 
