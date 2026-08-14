@@ -46,6 +46,357 @@ function noiseField(w, h, rand = Math.random) {
   return out
 }
 
+function upscaleNoise(ctx, W2, H2, cellsX, cellsY, tone, maxAlpha, rand = Math.random) {
+  const tiny = makeCanvas(cellsX, cellsY)
+  const tctx = tiny.getContext('2d')
+  const img = tctx.createImageData(cellsX, cellsY)
+  for (let i = 0; i < cellsX * cellsY; i++) {
+    img.data[i * 4] = tone[0]
+    img.data[i * 4 + 1] = tone[1]
+    img.data[i * 4 + 2] = tone[2]
+    img.data[i * 4 + 3] = Math.pow(rand(), 2.2) * maxAlpha * 255
+  }
+  tctx.putImageData(img, 0, 0)
+  ctx.save()
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(tiny, 0, 0, W2, H2)
+  ctx.restore()
+}
+
+function sobelNormalFromCanvas(heightCanvas, strength = 2.4) {
+  const w = heightCanvas.width
+  const h = heightCanvas.height
+  const src = heightCanvas.getContext('2d').getImageData(0, 0, w, h).data
+  const lum = (x, y) => {
+    const i = (((y + h) % h) * w + ((x + w) % w)) * 4
+    return (src[i] + src[i + 1] + src[i + 2]) / 765
+  }
+  const out = makeCanvas(w, h)
+  const octx = out.getContext('2d')
+  const img = octx.createImageData(w, h)
+  const d = img.data
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let nx = (lum(x - 1, y) - lum(x + 1, y)) * strength
+      let ny = (lum(x, y - 1) - lum(x, y + 1)) * strength
+      const nz = 1
+      const len = Math.sqrt(nx * nx + ny * ny + nz * nz)
+      nx /= len
+      ny /= len
+      const i = (y * w + x) * 4
+      d[i] = (nx * 0.5 + 0.5) * 255
+      d[i + 1] = (ny * 0.5 + 0.5) * 255
+      d[i + 2] = ((nz / len) * 0.5 + 0.5) * 255
+      d[i + 3] = 255
+    }
+  }
+  octx.putImageData(img, 0, 0)
+  return out
+}
+
+/**
+ * Photo-real aged leather for the journal covers. Paints color, height and
+ * roughness canvases together — cracks are dark AND depressed AND slightly
+ * glossy-edged; scuffs are pale AND matte; stains are dark AND oily. The
+ * front cover variant blind-embosses the tooling frame, compass rose and the
+ * owner's name into the material itself (with patchy worn gold-leaf
+ * remnants) instead of pasting bright graphics on top.
+ */
+export function agedLeatherMaps({ emboss = false, owner = '', title = '', size = 1024 } = {}) {
+  const color = makeCanvas(size, size)
+  const cctx = color.getContext('2d')
+  const height = makeCanvas(size, size)
+  const hctx = height.getContext('2d')
+  const rough = makeCanvas(size, size)
+  const rctx = rough.getContext('2d')
+
+  // --- base -----------------------------------------------------------
+  cctx.fillStyle = '#38220f'
+  cctx.fillRect(0, 0, size, size)
+  hctx.fillStyle = '#808080'
+  hctx.fillRect(0, 0, size, size)
+  rctx.fillStyle = '#9c9c9c' // base roughness ~0.61
+  rctx.fillRect(0, 0, size, size)
+
+  // large tonal patina — decades of handling and sun
+  upscaleNoise(cctx, size, size, 5, 5, [16, 8, 3], 0.5)
+  upscaleNoise(cctx, size, size, 5, 5, [92, 58, 30], 0.32)
+  upscaleNoise(cctx, size, size, 13, 13, [70, 42, 20], 0.3)
+  upscaleNoise(cctx, size, size, 34, 34, [20, 10, 4], 0.28)
+  upscaleNoise(rctx, size, size, 9, 9, [255, 255, 255], 0.16)
+  upscaleNoise(rctx, size, size, 9, 9, [0, 0, 0], 0.14)
+
+  // leather grain — fine pore speckle in color and height
+  for (let i = 0; i < 14000; i++) {
+    const x = Math.random() * size
+    const y = Math.random() * size
+    const light = Math.random() > 0.5
+    cctx.fillStyle = light ? 'rgba(120,80,45,0.06)' : 'rgba(10,5,2,0.08)'
+    cctx.fillRect(x, y, 1.3, 1.3)
+    hctx.fillStyle = light ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.07)'
+    hctx.fillRect(x, y, 1.3, 1.3)
+  }
+
+  // crack network — meandering dried-leather cracks, deeper near edges
+  const crack = (x, y, steps, ang) => {
+    cctx.strokeStyle = `rgba(12,6,2,${0.3 + Math.random() * 0.3})`
+    cctx.lineWidth = 1 + Math.random() * 1.8
+    hctx.strokeStyle = 'rgba(0,0,0,0.5)'
+    hctx.lineWidth = cctx.lineWidth + 1.2
+    rctx.strokeStyle = 'rgba(40,40,40,0.35)' // crack valleys keep old finish → glossier
+    rctx.lineWidth = cctx.lineWidth
+    cctx.beginPath()
+    hctx.beginPath()
+    rctx.beginPath()
+    cctx.moveTo(x, y)
+    hctx.moveTo(x, y)
+    rctx.moveTo(x, y)
+    for (let s = 0; s < steps; s++) {
+      ang += (Math.random() - 0.5) * 0.9
+      x += Math.cos(ang) * (6 + Math.random() * 14)
+      y += Math.sin(ang) * (6 + Math.random() * 14)
+      cctx.lineTo(x, y)
+      hctx.lineTo(x, y)
+      rctx.lineTo(x, y)
+      if (Math.random() > 0.82) {
+        // fork
+        let bx = x
+        let by = y
+        let ba = ang + (Math.random() > 0.5 ? 0.9 : -0.9)
+        cctx.moveTo(bx + Math.cos(ba) * 20, by + Math.sin(ba) * 20)
+        cctx.lineTo(bx, by)
+      }
+    }
+    cctx.stroke()
+    hctx.stroke()
+    rctx.stroke()
+  }
+  for (let i = 0; i < 26; i++) crack(Math.random() * size, Math.random() * size, 8 + Math.random() * 16, Math.random() * Math.PI * 2)
+  // dense crackle near the corners
+  for (const [cx, cy] of [[0, 0], [size, 0], [0, size], [size, size]]) {
+    for (let i = 0; i < 18; i++) {
+      crack(cx + (Math.random() - 0.5) * size * 0.3, cy + (Math.random() - 0.5) * size * 0.3, 3 + Math.random() * 5, Math.random() * Math.PI * 2)
+    }
+  }
+
+  // scuffs — pale abraded patches and streaks (matte in roughness)
+  for (let i = 0; i < 14; i++) {
+    const x = Math.random() * size
+    const y = Math.random() * size
+    const rr = 20 + Math.random() * 70
+    const g = cctx.createRadialGradient(x, y, 2, x, y, rr)
+    g.addColorStop(0, `rgba(146,108,66,${(0.08 + Math.random() * 0.12).toFixed(3)})`)
+    g.addColorStop(1, 'rgba(146,108,66,0)')
+    cctx.fillStyle = g
+    cctx.fillRect(0, 0, size, size)
+    const rg = rctx.createRadialGradient(x, y, 2, x, y, rr)
+    rg.addColorStop(0, 'rgba(255,255,255,0.3)')
+    rg.addColorStop(1, 'rgba(255,255,255,0)')
+    rctx.fillStyle = rg
+    rctx.fillRect(0, 0, size, size)
+  }
+
+  // oily dark stains (glossier)
+  for (let i = 0; i < 6; i++) {
+    const x = Math.random() * size
+    const y = Math.random() * size
+    const rr = 30 + Math.random() * 90
+    const g = cctx.createRadialGradient(x, y, 2, x, y, rr)
+    g.addColorStop(0, 'rgba(8,4,1,0.28)')
+    g.addColorStop(1, 'rgba(8,4,1,0)')
+    cctx.fillStyle = g
+    cctx.fillRect(0, 0, size, size)
+    const rg = rctx.createRadialGradient(x, y, 2, x, y, rr)
+    rg.addColorStop(0, 'rgba(0,0,0,0.35)')
+    rg.addColorStop(1, 'rgba(0,0,0,0)')
+    rctx.fillStyle = rg
+    rctx.fillRect(0, 0, size, size)
+  }
+
+  // worn edges: pale abraded rim where the finish rubbed off — soft streaks
+  // running ALONG each edge (never hard-edged dots)
+  for (let i = 0; i < 150; i++) {
+    const t = Math.random()
+    const e = Math.floor(Math.random() * 4)
+    const horizontal = e < 2
+    let x, y
+    const inset = 4 + Math.pow(Math.random(), 2) * 26
+    if (e === 0) (x = t * size), (y = inset)
+    else if (e === 1) (x = t * size), (y = size - inset)
+    else if (e === 2) (x = inset), (y = t * size)
+    else (x = size - inset), (y = t * size)
+    const len = 14 + Math.random() * 50
+    const thick = 2 + Math.random() * 6
+    const rx = horizontal ? len : thick
+    const ry = horizontal ? thick : len
+    const g = cctx.createRadialGradient(x, y, 0.5, x, y, Math.max(rx, ry))
+    g.addColorStop(0, `rgba(150,112,68,${(0.05 + Math.random() * 0.09).toFixed(3)})`)
+    g.addColorStop(1, 'rgba(150,112,68,0)')
+    cctx.save()
+    cctx.translate(x, y)
+    cctx.scale(horizontal ? 1 : thick / len, horizontal ? thick / len : 1)
+    cctx.translate(-x, -y)
+    cctx.fillStyle = g
+    cctx.beginPath()
+    cctx.arc(x, y, Math.max(rx, ry), 0, Math.PI * 2)
+    cctx.fill()
+    cctx.restore()
+    const rg = rctx.createRadialGradient(x, y, 0.5, x, y, Math.max(rx, ry))
+    rg.addColorStop(0, 'rgba(255,255,255,0.12)')
+    rg.addColorStop(1, 'rgba(255,255,255,0)')
+    rctx.save()
+    rctx.translate(x, y)
+    rctx.scale(horizontal ? 1 : thick / len, horizontal ? thick / len : 1)
+    rctx.translate(-x, -y)
+    rctx.fillStyle = rg
+    rctx.beginPath()
+    rctx.arc(x, y, Math.max(rx, ry), 0, Math.PI * 2)
+    rctx.fill()
+    rctx.restore()
+  }
+  const grime = cctx.createRadialGradient(size / 2, size / 2, size * 0.36, size / 2, size / 2, size * 0.74)
+  grime.addColorStop(0, 'rgba(0,0,0,0)')
+  grime.addColorStop(1, 'rgba(8,4,1,0.5)')
+  cctx.fillStyle = grime
+  cctx.fillRect(0, 0, size, size)
+  // rounded-rim illusion: height falls off at the outer border
+  const rim = hctx.createRadialGradient(size / 2, size / 2, size * 0.62, size / 2, size / 2, size * 0.75)
+  rim.addColorStop(0, 'rgba(0,0,0,0)')
+  rim.addColorStop(1, 'rgba(0,0,0,0.55)')
+  hctx.fillStyle = rim
+  hctx.fillRect(0, 0, size, size)
+
+  // faint fingerprints in the grime — barely-there smudges
+  for (let f = 0; f < 2; f++) {
+    const fx = size * (0.2 + Math.random() * 0.6)
+    const fy = size * (0.2 + Math.random() * 0.6)
+    cctx.strokeStyle = 'rgba(160,125,80,0.03)'
+    cctx.lineWidth = 1.4
+    for (let i = 0; i < 5; i++) {
+      const r = 4 + i * 3
+      const a0 = Math.random() * Math.PI * 2
+      cctx.beginPath()
+      cctx.ellipse(fx, fy, r, r * 0.7, 0.4, a0, a0 + Math.PI * 0.9)
+      cctx.stroke()
+    }
+  }
+
+  // --- blind embossing (front cover only) -------------------------------
+  if (emboss) {
+    const embossStroke = (draw) => {
+      // dark impression in color, depression in height, patchy leaf remnants
+      cctx.save()
+      cctx.strokeStyle = 'rgba(10,5,2,0.6)'
+      cctx.fillStyle = 'rgba(10,5,2,0.6)'
+      draw(cctx)
+      cctx.restore()
+      hctx.save()
+      hctx.strokeStyle = 'rgba(0,0,0,0.85)'
+      hctx.fillStyle = 'rgba(0,0,0,0.85)'
+      draw(hctx)
+      hctx.restore()
+    }
+    const leafRemnants = (draw, alpha = 0.55, wear = 130) => {
+      const tmp = makeCanvas(size, size)
+      const tctx = tmp.getContext('2d')
+      tctx.strokeStyle = `rgba(190,150,80,${alpha})`
+      tctx.fillStyle = `rgba(190,150,80,${alpha})`
+      draw(tctx)
+      // wear the leaf away in patches
+      tctx.globalCompositeOperation = 'destination-out'
+      for (let i = 0; i < wear; i++) {
+        tctx.beginPath()
+        tctx.arc(Math.random() * size, Math.random() * size, 4 + Math.random() * 26, 0, Math.PI * 2)
+        tctx.fill()
+      }
+      cctx.drawImage(tmp, 0, 0)
+    }
+
+    // tooling frames
+    const frame = (inset, lw) => (ctx2) => {
+      ctx2.lineWidth = lw
+      ctx2.strokeRect(size * inset, size * inset, size * (1 - 2 * inset), size * (1 - 2 * inset))
+    }
+    embossStroke(frame(0.06, 4))
+    embossStroke(frame(0.075, 2))
+    leafRemnants(frame(0.06, 2))
+
+    // compass rose, upper center — thin tooled linework, heavily worn
+    const cx = size / 2
+    const cy = size * 0.34
+    const rose = (ctx2) => {
+      ctx2.lineWidth = 2.6
+      ctx2.beginPath()
+      ctx2.arc(cx, cy, size * 0.115, 0, Math.PI * 2)
+      ctx2.stroke()
+      ctx2.lineWidth = 1.4
+      ctx2.beginPath()
+      ctx2.arc(cx, cy, size * 0.096, 0, Math.PI * 2)
+      ctx2.stroke()
+      // degree ticks between the rings
+      for (let i = 0; i < 32; i++) {
+        const a = (i / 32) * Math.PI * 2
+        ctx2.lineWidth = i % 8 === 0 ? 2 : 1
+        ctx2.beginPath()
+        ctx2.moveTo(cx + Math.cos(a) * size * 0.099, cy + Math.sin(a) * size * 0.099)
+        ctx2.lineTo(cx + Math.cos(a) * size * 0.112, cy + Math.sin(a) * size * 0.112)
+        ctx2.stroke()
+      }
+      // slim outline points, not solid star fills
+      ctx2.lineWidth = 1.8
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2 - Math.PI / 2 + 0.04
+        const long = i % 2 === 0
+        const r = size * (long ? 0.082 : 0.048)
+        const w2 = size * (long ? 0.009 : 0.006)
+        ctx2.beginPath()
+        ctx2.moveTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r)
+        ctx2.lineTo(cx - Math.sin(a) * w2, cy + Math.cos(a) * w2)
+        ctx2.lineTo(cx + Math.sin(a) * w2, cy - Math.cos(a) * w2)
+        ctx2.closePath()
+        ctx2.stroke()
+        if (long) ctx2.fill()
+      }
+      ctx2.beginPath()
+      ctx2.arc(cx, cy, size * 0.006, 0, Math.PI * 2)
+      ctx2.fill()
+    }
+    embossStroke(rose)
+    leafRemnants(rose, 0.38, 170)
+
+    // owner name + title — old book face, blind-embossed with worn gilt
+    const nameDraw = (ctx2) => {
+      ctx2.textAlign = 'center'
+      ctx2.textBaseline = 'middle'
+      ctx2.font = `${size * 0.062}px "IM Fell English SC", serif`
+      ctx2.fillText(owner, cx, size * 0.585)
+      ctx2.font = `${size * 0.036}px "IM Fell English SC", serif`
+      const prev = ctx2.letterSpacing
+      ctx2.letterSpacing = `${size * 0.014}px`
+      ctx2.fillText(title, cx + size * 0.007, size * 0.675)
+      ctx2.letterSpacing = prev || '0px'
+      // small tooling diamond between
+      ctx2.beginPath()
+      ctx2.moveTo(cx, size * 0.625)
+      ctx2.lineTo(cx + size * 0.008, size * 0.633)
+      ctx2.lineTo(cx, size * 0.641)
+      ctx2.lineTo(cx - size * 0.008, size * 0.633)
+      ctx2.closePath()
+      ctx2.fill()
+    }
+    embossStroke(nameDraw)
+    leafRemnants(nameDraw)
+  }
+
+  const map = new THREE.CanvasTexture(color)
+  map.colorSpace = THREE.SRGBColorSpace
+  map.anisotropy = 8
+  const normalMap = new THREE.CanvasTexture(sobelNormalFromCanvas(height, 2.6))
+  const roughnessMap = new THREE.CanvasTexture(rough)
+  return { map: track(map), normalMap: track(normalMap), roughnessMap: track(roughnessMap) }
+}
+
 /** Worn brown leather: mottled, scratched, stitched, sun-bleached at the edges. */
 export function leatherColorTexture(size = 512) {
   const c = makeCanvas(size, size)
@@ -290,21 +641,32 @@ export function emblemTexture(_monogram, size = 512) {
   return track(tex)
 }
 
-/** Gilt spine title, rendered vertically (transparent background). */
+/** Spine title — worn blind emboss with faded gilt, rendered vertically (transparent background). */
 export function spineTexture(title, w = 128, h = 512) {
   const c = makeCanvas(w, h)
   const ctx = c.getContext('2d')
   ctx.clearRect(0, 0, w, h)
-  ctx.fillStyle = GOLD
-  ctx.font = `${w * 0.36}px "Rye", "IM Fell English SC", serif`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   ctx.save()
   ctx.translate(w / 2, h / 2)
   ctx.rotate(Math.PI / 2)
-  ctx.letterSpacing = '5px'
+  ctx.letterSpacing = '6px'
+  ctx.font = `${w * 0.3}px "IM Fell English SC", serif`
+  // dark impression, then patchy faded gilt
+  ctx.fillStyle = 'rgba(10,5,2,0.7)'
+  ctx.fillText(title, 1, 1)
+  ctx.fillStyle = 'rgba(178,140,74,0.5)'
   ctx.fillText(title, 0, 0)
   ctx.restore()
+  // wear the gilt away in patches
+  ctx.globalCompositeOperation = 'destination-out'
+  for (let i = 0; i < 26; i++) {
+    ctx.beginPath()
+    ctx.arc(Math.random() * w, Math.random() * h, 3 + Math.random() * 12, 0, Math.PI * 2)
+    ctx.fill()
+  }
+  ctx.globalCompositeOperation = 'source-over'
   const tex = new THREE.CanvasTexture(c)
   tex.colorSpace = THREE.SRGBColorSpace
   return track(tex)

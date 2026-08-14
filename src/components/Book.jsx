@@ -6,11 +6,11 @@ import { COVER_W, EDGE_ZONE, PAGE_H, SHEET_T } from '../constants.js'
 import { FACES, SHEET_COUNT, spreadForFace } from '../data/compileBook.js'
 import { renderPageFace, renderEndpaper } from '../three/pageTexture.js'
 import {
-  leatherColorTexture,
-  grainNormalTexture,
+  agedLeatherMaps,
   shadowBlobTexture,
   disposeAllProceduralTextures,
 } from '../three/proceduralTextures.js'
+import { bookMeta } from '../data/bookContent.js'
 import { createSheetUniforms } from '../three/bendMaterial.js'
 import { buildSheetGeometries, disposeSheetGeometries } from '../three/sheetGeometry.js'
 import { tearShadowSpots } from '../three/tearProfiles.js'
@@ -87,14 +87,21 @@ export default function Book() {
     return new THREE.MeshStandardMaterial({ map: texture, roughness: 0.9 })
   }, [])
 
-  const leatherMat = useMemo(() => {
-    return new THREE.MeshStandardMaterial({
-      map: leatherColorTexture(),
-      normalMap: grainNormalTexture(),
-      normalScale: new THREE.Vector2(0.6, 0.6),
-      roughness: 0.52,
-      metalness: 0.12,
-    })
+  // aged leather — front board carries the blind embossing; back/spine are plain
+  const leatherMats = useMemo(() => {
+    const make = (maps) =>
+      new THREE.MeshStandardMaterial({
+        map: maps.map,
+        normalMap: maps.normalMap,
+        normalScale: new THREE.Vector2(1.15, 1.15),
+        roughnessMap: maps.roughnessMap,
+        roughness: 1,
+        metalness: 0.06,
+      })
+    return {
+      front: make(agedLeatherMaps({ emboss: true, owner: bookMeta.owner, title: bookMeta.title })),
+      plain: make(agedLeatherMaps({ size: 512 })),
+    }
   }, [])
 
   useEffect(
@@ -103,13 +110,16 @@ export default function Book() {
       mirrored.forEach((t) => t && t.dispose())
       endpaperMat.map.dispose()
       endpaperMat.dispose()
-      leatherMat.map.dispose()
-      leatherMat.normalMap.dispose()
-      leatherMat.dispose()
+      for (const m of [leatherMats.front, leatherMats.plain]) {
+        m.map.dispose()
+        m.normalMap.dispose()
+        m.roughnessMap.dispose()
+        m.dispose()
+      }
       disposeSheetGeometries(sheetGeoms)
       disposeAllProceduralTextures()
     },
-    [faceRender, mirrored, endpaperMat, leatherMat, sheetGeoms]
+    [faceRender, mirrored, endpaperMat, leatherMats, sheetGeoms]
   )
 
   // ---- visual state derived from spread + in-flight turn ----------------
@@ -394,8 +404,8 @@ export default function Book() {
               if (!useBookStore.getState().isOpen) document.body.style.cursor = 'auto'
             }}
           >
-            <BackCover leatherMat={leatherMat} endpaperMat={endpaperMat} />
-            <Spine openRef={openRef} leatherMat={leatherMat} />
+            <BackCover plainLeatherMat={leatherMats.plain} endpaperMat={endpaperMat} />
+            <Spine openRef={openRef} leatherMat={leatherMats.plain} />
 
             <PageBlock side="right" sheets={effRight} />
             <PageBlock side="left" sheets={effLeft} />
@@ -438,7 +448,7 @@ export default function Book() {
 
             <FrontCover
               ref={coverPivotRef}
-              leatherMat={leatherMat}
+              frontLeatherMat={leatherMats.front}
               endpaperMat={endpaperMat}
               onEmblemActivate={emblemActivate}
               onBodyClick={bodyClick}

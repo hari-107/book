@@ -31,7 +31,7 @@ export default function Spine({ openRef, leatherMat }) {
       {/* gilt spine title */}
       <mesh position={[-R - 0.004, 0, 0]} rotation={[0, -Math.PI / 2, 0]}>
         <planeGeometry args={[R * 1.6, COVER_H * 0.82]} />
-        <meshStandardMaterial map={titleTex} transparent metalness={0.6} roughness={0.4} />
+        <meshStandardMaterial map={titleTex} transparent metalness={0.2} roughness={0.65} />
       </mesh>
     </mesh>
   )
