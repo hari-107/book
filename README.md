@@ -51,6 +51,8 @@ Requires Node.js 18+.
 | Double-click an **INDEX entry** | Rapidly but visibly turns pages to that section |
 | Double-click **anywhere else on the book** | Picks it up / puts it down (putting down resets the view) |
 | Drag while held | Rotates the book freely on all axes |
+| **Hold + drag a photograph** | Pick it up and place it anywhere on the spread — it stays where you leave it, page after page |
+| Double-click the **red ribbon** or the **spine** (or `C`) | Closes the book — it remembers your spread and reopens there |
 | Click / tap a **photograph** | It jumps up to meet you, caption and all |
 | Single-click the book | It flinches. Books are ticklish |
 | Mouse wheel / pinch | Zoom (clamped) |

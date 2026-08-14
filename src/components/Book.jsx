@@ -150,34 +150,19 @@ export default function Book() {
   }, [spread])
 
   // ---- animations -------------------------------------------------------
-  const openBook = useCallback(() => {
-    const s = useBookStore.getState()
-    if (s.isOpen || s.opening) return
-    s.setOpening(true)
-    sfx('creak') // an old spine resisting, then giving way
-    gsap.to(openRef.current, {
-      p: 1,
-      duration: 2.3,
-      ease: 'power3.inOut',
-      onComplete: () => {
-        const st = useBookStore.getState()
-        st.setOpening(false)
-        st.setOpen(true)
-      },
-    })
-  }, [])
-
   const doTurn = useCallback(
-    (dir, dur = 1.05, onDone) => {
+    (dir, dur = 1.05, onDone, opts = {}) => {
       const s = useBookStore.getState()
       if (turnBusy.current || !s.isOpen || s.opening) return onDone && onDone(false)
+      if (s.closing && !opts.force) return onDone && onDone(false)
+      if (s.photoDrag) return onDone && onDone(false) // a print in hand beats the page
       const cur = s.spread
       if ((dir > 0 && cur >= N) || (dir < 0 && cur <= 0)) return onDone && onDone(false)
 
       const sheet = dir > 0 ? cur : cur - 1
       turnBusy.current = true
       s.setTurning(true)
-      sfx('flip')
+      if (!opts.silent) sfx('flip')
 
       const mats = sheetMaterialsRef.current
       if (mats) {
@@ -219,6 +204,77 @@ export default function Book() {
     [faceRender, mirrored, uniforms]
   )
 
+  const openBook = useCallback(() => {
+    const s = useBookStore.getState()
+    if (s.isOpen || s.opening || s.closing) return
+    s.setOpening(true)
+    sfx('creak') // an old spine resisting, then giving way
+    gsap.to(openRef.current, {
+      p: 1,
+      duration: 2.3,
+      ease: 'power3.inOut',
+      onComplete: () => {
+        const st = useBookStore.getState()
+        st.setOpening(false)
+        st.setOpen(true)
+        // the book remembers where you were — riffle back to the last spread
+        const restore = st.lastSpread
+        if (restore > 0) {
+          const step = () => {
+            const cur = useBookStore.getState().spread
+            if (cur >= restore) return
+            doTurn(
+              1,
+              Math.max(0.11, 0.24 - (restore - cur) * 0.012),
+              (ok) => (ok ? step() : gsap.delayedCall(0.15, step)),
+              { force: true, silent: cur !== 0 && cur !== restore - 1 }
+            )
+          }
+          step()
+        }
+      },
+    })
+  }, [doTurn])
+
+  /**
+   * Close the journal like a real book: any print in hand is dropped, the
+   * pages riffle back to the cover, then the leather closes with weight and
+   * lands with a thump. The last spread is remembered for reopening.
+   */
+  const closeBook = useCallback(() => {
+    const s = useBookStore.getState()
+    if (!s.isOpen || s.opening || s.closing) return
+    s.setClosing(true)
+    s.setLastSpread(s.spread)
+    s.focusImage(null)
+    s.setNavOpen(false)
+    if (s.held) s.putDown()
+    const riffle = () => {
+      const cur = useBookStore.getState().spread
+      if (cur > 0) {
+        doTurn(-1, Math.max(0.1, 0.22 - cur * 0.01), (ok) => (ok ? riffle() : gsap.delayedCall(0.15, riffle)), {
+          force: true,
+          silent: cur !== 1,
+        })
+      } else {
+        sfx('creak')
+        gsap.to(openRef.current, {
+          p: 0,
+          duration: 1.7,
+          ease: 'power3.inOut',
+          onComplete: () => {
+            const st = useBookStore.getState()
+            st.setClosing(false)
+            st.setOpen(false)
+            sfx('thump') // the cover lands
+            nudge(0.9)
+          },
+        })
+      }
+    }
+    riffle()
+  }, [doTurn, nudge])
+
   const jumpToFace = useCallback(
     (f) => {
       const target = spreadForFace(f)
@@ -237,6 +293,7 @@ export default function Book() {
   useEffect(() => {
     registerApi({
       openBook,
+      closeBook,
       next: () => {
         const s = useBookStore.getState()
         if (!s.isOpen) return openBook()
@@ -246,7 +303,7 @@ export default function Book() {
       jumpToFace,
       dragGroup: dragRef,
     })
-  }, [registerApi, openBook, doTurn, jumpToFace])
+  }, [registerApi, openBook, closeBook, doTurn, jumpToFace])
 
   // pick-up lift
   useEffect(() => {
@@ -347,12 +404,23 @@ export default function Book() {
   // ---- interaction handlers --------------------------------------------
   const bodyDouble = useCallback(() => {
     const s = useBookStore.getState()
+    if (s.closing || s.photoDrag) return
     if (!s.isOpen) return openBook()
     if (s.navOpen) return s.setNavOpen(false)
     if (s.focusedImage) return s.focusImage(null)
     s.held ? s.putDown() : s.pickUp()
   }, [openBook])
   const bodyDoubleTap = useDoubleTap(bodyDouble)
+
+  // the red ribbon and the spine are the book's physical "close me" handles
+  const ribbonDouble = useCallback(
+    (e) => {
+      e.stopPropagation()
+      closeBook()
+    },
+    [closeBook]
+  )
+  const ribbonTap = useDoubleTap(ribbonDouble)
 
   const bodyClick = useCallback(() => {
     const s = useBookStore.getState()
@@ -370,6 +438,7 @@ export default function Book() {
   const faceDouble = useCallback(
     (e, side) => {
       const s = useBookStore.getState()
+      if (s.closing || s.photoDrag) return
       if (!s.isOpen) return openBook()
       if (s.navOpen) return s.setNavOpen(false)
 
@@ -433,7 +502,7 @@ export default function Book() {
             }}
           >
             <BackCover plainLeatherMat={leatherMats.plain} endpaperMat={endpaperMat} />
-            <Spine openRef={openRef} leatherMat={leatherMats.plain} />
+            <Spine openRef={openRef} leatherMat={leatherMats.plain} onCloseBook={ribbonDouble} />
 
             <PageBlock side="right" sheets={effRight} />
             <PageBlock side="left" sheets={effLeft} />
@@ -485,8 +554,21 @@ export default function Book() {
               onBodyClick={bodyClick}
             />
 
-            {/* red page ribbon draped down the gutter */}
-            <mesh ref={ribbonRef} position={[0.01, -PAGE_H / 2 + 0.32, 0.1]} rotation={[0, 0, 0.02]} raycast={() => null} visible={false}>
+            {/* red page ribbon draped down the gutter — double-click it to close the book */}
+            <mesh
+              ref={ribbonRef}
+              position={[0.01, -PAGE_H / 2 + 0.32, 0.1]}
+              rotation={[0, 0, 0.02]}
+              visible={false}
+              onDoubleClick={ribbonDouble}
+              onPointerUp={ribbonTap}
+              onClick={(e) => e.stopPropagation()}
+              onPointerOver={(e) => {
+                e.stopPropagation()
+                document.body.style.cursor = 'pointer'
+              }}
+              onPointerOut={() => (document.body.style.cursor = 'auto')}
+            >
               <planeGeometry args={[0.075, 0.85]} />
               <meshStandardMaterial color="#7a1f1f" roughness={0.55} transparent opacity={0} side={THREE.DoubleSide} />
             </mesh>

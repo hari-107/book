@@ -14,8 +14,16 @@ export const useBookStore = create((set, get) => ({
   // Book state
   isOpen: false,
   opening: false,
+  closing: false,
   spread: 0, // number of sheets turned (0..SHEET_COUNT)
+  lastSpread: 0, // remembered across close/reopen
   turning: false,
+
+  // A photograph is being dragged — photo interaction takes priority
+  photoDrag: false,
+  setPhotoDrag: (photoDrag) => set({ photoDrag }),
+  setClosing: (closing) => set({ closing }),
+  setLastSpread: (lastSpread) => set({ lastSpread }),
 
   // Held / rotating state
   held: false,

@@ -18,7 +18,7 @@ import { toggleMute } from '../utils/sound.js'
  */
 export default function Controls() {
   const { camera, gl, size } = useThree()
-  const zoom = useRef({ target: 3, fit: 3, push: 0 })
+  const zoom = useRef({ target: 3, fit: 3, push: 0, closedPull: 0.32 })
   const sway = useRef({ x: 0, y: 0 })
   const intro = useRef({ t: 0 })
   const resetToken = useBookStore((s) => s.resetToken)
@@ -46,7 +46,8 @@ export default function Controls() {
     gsap.to(zoom.current, { target: zoom.current.fit, duration: 0.9, ease: 'power3.out' })
   }, [resetToken])
 
-  // gentle push-in while a page turns or the cover opens
+  // gentle push-in while a page turns or the cover opens;
+  // the camera sits back a little while the book rests closed
   useEffect(() => {
     const unsub = useBookStore.subscribe((s, prev) => {
       if ((s.turning && !prev.turning) || (s.opening && !prev.opening)) {
@@ -54,6 +55,10 @@ export default function Controls() {
         gsap.to(zoom.current, { push: -0.12, duration: 0.45, ease: 'power2.out' })
       } else if ((!s.turning && prev.turning) || (!s.opening && prev.opening)) {
         gsap.to(zoom.current, { push: 0, duration: 0.8, ease: 'power2.inOut' })
+      }
+      if (s.isOpen !== prev.isOpen || s.opening !== prev.opening) {
+        const pull = !s.isOpen && !s.opening ? 0.32 : 0
+        gsap.to(zoom.current, { closedPull: pull, duration: 1.4, ease: 'power2.inOut' })
       }
     })
     return unsub
@@ -106,7 +111,7 @@ export default function Controls() {
         pinchDist = d
         return
       }
-      if (dragging && useBookStore.getState().held) {
+      if (dragging && useBookStore.getState().held && !useBookStore.getState().photoDrag) {
         const g = useBookStore.getState().api?.dragGroup?.current
         if (g) {
           const dx = e.clientX - lastX
@@ -147,6 +152,7 @@ export default function Controls() {
       else if (e.key === 'ArrowLeft') s.api?.prev()
       else if (e.key === 'r' || e.key === 'R') s.requestReset()
       else if (e.key === 'm' || e.key === 'M') toggleMute()
+      else if (e.key === 'c' || e.key === 'C') s.api?.closeBook?.()
       else if (e.key === 'Escape') s.escape()
     }
 
@@ -170,7 +176,7 @@ export default function Controls() {
     const k = Math.min(1, dt * 5)
     const it = intro.current.t
     // during the intro the camera hangs back high in the gloom, then settles in
-    const z = (zoom.current.target + zoom.current.push) * (1 + (1 - it) * 0.85)
+    const z = (zoom.current.target + zoom.current.push + zoom.current.closedPull) * (1 + (1 - it) * 0.85)
     const baseY = 0.16 + (1 - it) * 0.85
     camera.position.z += (z - camera.position.z) * k
     // subtle parallax — sitting at the desk, leaning slightly with the pointer

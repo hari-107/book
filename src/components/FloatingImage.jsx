@@ -10,8 +10,9 @@ import {
   shadowBlobTexture,
   photoCaptionTexture,
 } from '../three/proceduralTextures.js'
-import { GOLD } from '../constants.js'
+import { GOLD, PAGE_W, PAGE_H } from '../constants.js'
 import { sfx } from '../utils/sound.js'
+import { photoPositions, nextTopOffset } from '../utils/photoPositions.js'
 
 /**
  * One photograph, treated like a physical print somebody tossed onto the
@@ -44,6 +45,7 @@ export default function FloatingImage({ img, slot, hidden, leaving, seed }) {
   const groupRef = useRef()
   const wobbleRef = useRef()
   const [hovered, setHovered] = useState(false)
+  const [draggingState, setDraggingState] = useState(false)
 
   const focusedImage = useBookStore((s) => s.focusedImage)
   const focusImage = useBookStore((s) => s.focusImage)
@@ -52,6 +54,9 @@ export default function FloatingImage({ img, slot, hidden, leaving, seed }) {
   const rnd = useMemo(() => seededRand(seed + 7), [seed])
 
   const target = useMemo(() => {
+    // wherever the reader last left this print wins over the seeded scatter
+    const saved = photoPositions.get(img.id)
+    if (saved) return saved
     const [ax, ay] = ANCHORS[slot % ANCHORS.length]
     return {
       x: ax * 1.08 + (rnd() - 0.5) * 0.14,
@@ -207,9 +212,11 @@ export default function FloatingImage({ img, slot, hidden, leaving, seed }) {
   // ---- re-scatter when the slot layout changes (page change, survivor) ----
   useEffect(() => {
     const g = groupRef.current
-    if (!g || anim.current.base === 0) return
+    // photos the reader placed by hand stay exactly where they were put
+    if (!g || anim.current.base === 0 || photoPositions.has(img.id)) return
     gsap.to(g.position, { x: target.x, y: target.y, z: target.z, duration: 0.7, ease: 'back.out(1.8)' })
     gsap.to(g.rotation, { z: target.rot, duration: 0.7, ease: 'elastic.out(1, 0.5)' })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target])
 
   // ---- flicked away when leaving ------------------------------------------
@@ -232,24 +239,124 @@ export default function FloatingImage({ img, slot, hidden, leaving, seed }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leaving])
 
+  // ---- physically movable prints ------------------------------------------
+  // pointer-down + move = grab and drag anywhere on the spread; a clean
+  // click (no movement) still focuses. Drag always beats page turning.
+  const drag = useRef({ pending: false, active: false, sx: 0, sy: 0, moved: false, tx: 0, ty: 0, vx: 0, vy: 0 })
+
+  const beginDrag = () => {
+    const d = drag.current
+    const g = groupRef.current
+    if (!g) return
+    d.active = true
+    d.tx = g.position.x
+    d.ty = g.position.y
+    setDraggingState(true)
+    useBookStore.getState().setPhotoDrag(true)
+    gsap.killTweensOf(g.position)
+    gsap.killTweensOf(g.rotation)
+    gsap.to(g.position, { z: 0.62, duration: 0.18, ease: 'power2.out' }) // lift off the parchment
+    document.body.style.cursor = 'grabbing'
+    sfx('tick')
+  }
+
+  const endDrag = () => {
+    const d = drag.current
+    const g = groupRef.current
+    d.pending = false
+    if (!d.active || !g) return
+    d.active = false
+    setDraggingState(false)
+    useBookStore.getState().setPhotoDrag(false)
+    // settle: drop with a small bounce onto the top of the pile
+    const restZ = 0.315 + nextTopOffset()
+    const restRot = g.rotation.z + (Math.random() - 0.5) * 0.05
+    gsap.to(g.position, { z: restZ, duration: 0.38, ease: 'bounce.out' })
+    gsap.to(g.rotation, { x: 0, y: 0, z: restRot, duration: 0.45, ease: 'elastic.out(1, 0.5)' })
+    gsap.delayedCall(0.12, () => sfx('slap'))
+    photoPositions.set(img.id, { x: g.position.x, y: g.position.y, z: restZ, rot: restRot })
+    document.body.style.cursor = 'grab'
+  }
+
+  useEffect(() => {
+    const move = (e) => {
+      const d = drag.current
+      if (!d.pending || d.active) return
+      if (Math.hypot(e.clientX - d.sx, e.clientY - d.sy) > 7) {
+        d.moved = true
+        beginDrag()
+      }
+    }
+    const up = () => endDrag()
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', up)
+    return () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', up)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const grab = (e) => {
+    const s = useBookStore.getState()
+    if (!s.isOpen || s.turning || s.navOpen || focused || leaving) return
+    e.stopPropagation()
+    const d = drag.current
+    d.pending = true
+    d.moved = false
+    d.sx = e.nativeEvent?.clientX ?? e.clientX ?? 0
+    d.sy = e.nativeEvent?.clientY ?? e.clientY ?? 0
+  }
+
+  const dragMove = (e) => {
+    const d = drag.current
+    if (!d.active) return
+    e.stopPropagation()
+    const g = groupRef.current
+    if (!g || !g.parent) return
+    const local = g.parent.worldToLocal(e.point.clone())
+    // constrained to the open spread, with a little overhang allowed
+    d.tx = Math.max(-(PAGE_W + 0.12), Math.min(PAGE_W + 0.12, local.x))
+    d.ty = Math.max(-(PAGE_H / 2 + 0.08), Math.min(PAGE_H / 2 + 0.08, local.y))
+  }
+
   const activate = (e) => {
     e.stopPropagation()
+    if (drag.current.moved) return // a drag, not a click
     focusImage(focused ? null : img.id)
   }
 
-  // ---- idle paper wobble + visibility --------------------------------------
+  // ---- drag follow · idle paper wobble · visibility -------------------------
   useFrame(({ clock }, dt) => {
     const g = groupRef.current
     const w = wobbleRef.current
     if (!g || !w) return
     const t = clock.getElapsedTime()
     const a = anim.current
+    const d = drag.current
 
-    const shiver = hovered ? Math.sin(t * 16) * 0.028 : 0
+    if (d.active) {
+      // smooth pursuit of the pointer with a little inertia,
+      // velocity tilting the print like real cardstock in hand
+      const k = Math.min(1, dt * 15)
+      const oldX = g.position.x
+      const oldY = g.position.y
+      g.position.x += (d.tx - oldX) * k
+      g.position.y += (d.ty - oldY) * k
+      const vx = (g.position.x - oldX) / Math.max(dt, 1e-3)
+      const vy = (g.position.y - oldY) / Math.max(dt, 1e-3)
+      const kr = Math.min(1, dt * 9)
+      g.rotation.y += (THREE.MathUtils.clamp(vx * 0.11, -0.24, 0.24) - g.rotation.y) * kr
+      g.rotation.x += (THREE.MathUtils.clamp(-vy * 0.1, -0.2, 0.2) - g.rotation.x) * kr
+    }
+
+    const shiver = hovered && !d.active ? Math.sin(t * 16) * 0.028 : 0
     w.rotation.z = Math.sin(t * 1.2 + seed) * 0.02 + shiver
     w.position.z = Math.sin(t * 0.85 + seed * 1.7) * 0.016 + a.hoverLift
-    a.hoverLift += ((hovered ? 0.06 : 0) - a.hoverLift) * Math.min(1, dt * 8)
-    const sc = 1 + (hovered ? 0.08 : 0)
+    a.hoverLift += ((hovered && !d.active ? 0.06 : 0) - a.hoverLift) * Math.min(1, dt * 8)
+    const sc = 1 + (hovered && !d.active ? 0.08 : 0)
     w.scale.x += (sc - w.scale.x) * Math.min(1, dt * 8)
     w.scale.y = w.scale.x
 
@@ -259,12 +366,28 @@ export default function FloatingImage({ img, slot, hidden, leaving, seed }) {
     materials.photo.opacity = o
     materials.frame.opacity = o * 0.96
     materials.tape.opacity = o * 0.9
-    materials.shadow.opacity = o * 0.5
+    materials.shadow.opacity = o * (d.active ? 0.95 : 0.5) // airborne prints throw harder shadows
     if (materials.caption) materials.caption.opacity = o * 0.95
     g.visible = o > 0.02
   })
 
   return (
+    <>
+      {/* while a print is in hand: an invisible tracking surface over the
+          whole spread feeds the drag raycasts and swallows page clicks */}
+      {draggingState && (
+        <mesh
+          position={[0, 0, 0.62]}
+          onPointerMove={dragMove}
+          onPointerUp={(e) => {
+            e.stopPropagation()
+            endDrag()
+          }}
+        >
+          <planeGeometry args={[4.4, 2.8]} />
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} side={THREE.DoubleSide} />
+        </mesh>
+      )}
     <group ref={groupRef} visible={false}>
       <group ref={wobbleRef}>
         {/* drop shadow cast onto the parchment below */}
@@ -281,14 +404,15 @@ export default function FloatingImage({ img, slot, hidden, leaving, seed }) {
           material={materials.photo}
           onClick={activate}
           onDoubleClick={activate}
+          onPointerDown={grab}
           onPointerOver={(e) => {
             e.stopPropagation()
             setHovered(true)
-            document.body.style.cursor = 'pointer'
+            document.body.style.cursor = drag.current.active ? 'grabbing' : 'grab'
           }}
           onPointerOut={() => {
             setHovered(false)
-            document.body.style.cursor = 'auto'
+            if (!drag.current.active) document.body.style.cursor = 'auto'
           }}
         >
           <planeGeometry args={[imgW, imgH]} />
@@ -317,5 +441,6 @@ export default function FloatingImage({ img, slot, hidden, leaving, seed }) {
         )}
       </group>
     </group>
+    </>
   )
 }

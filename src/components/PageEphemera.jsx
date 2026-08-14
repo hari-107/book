@@ -133,7 +133,9 @@ export default function PageEphemera({ spread, visibleFaces, stackTopZ }) {
       for (let i = 0; i < n; i++) kinds.push(comp.kinds[Math.floor(rnd() * comp.kinds.length)])
     }
     // overlap is allowed — duplicate spots just stack; cap for performance
-    return kinds.slice(0, 6).map((kind) => {
+    // (smaller screens carry fewer loose objects)
+    const cap = typeof window !== 'undefined' && window.innerWidth < 820 ? 3 : 6
+    return kinds.slice(0, cap).map((kind) => {
       const spot = SPOTS[Math.floor(rnd() * SPOTS.length)]
       const is3D = kind === 'coin' || kind === 'seal'
       const [w, h] = ITEM_SIZE[kind] || [0.26, 0.26]

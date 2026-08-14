@@ -312,8 +312,8 @@ export default function BackgroundWorld() {
   return (
     <>
       <group ref={groupRef}>
-        <Dust />
-        <DriftingScraps />
+        <Dust count={typeof window !== 'undefined' && window.innerWidth < 820 ? 55 : 110} />
+        <DriftingScraps count={typeof window !== 'undefined' && window.innerWidth < 820 ? 3 : 5} />
       </group>
       <LampFlicker />
       <EggBurst />

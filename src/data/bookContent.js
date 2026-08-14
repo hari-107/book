@@ -51,9 +51,11 @@ export const structural = {
       { type: 'lead', text: 'You found the book. Excellent.' },
       { type: 'list', items: [
         'Double-click near a page’s outer edge → it turns. Right edge goes onward, left edge goes back.',
+        'Hold and drag a photograph → rearrange the evidence. It stays where you leave it.',
+        'Click a photograph → it jumps up to meet you. Esc sends it back.',
         'Double-click anywhere else on the book → pick it up and spin it. Double-click again to set it down.',
         'Double-click the little ✦ seal at the foot of any page → the book’s own map opens.',
-        'Click a photograph → it jumps up to meet you. Esc sends it back.',
+        'Double-click the red ribbon or the spine (or press C) → the book closes. It remembers your page.',
         'Arrow keys turn pages. R resets the view. M silences the paper. That’s all the machinery.',
       ] },
       { type: 'note', text: 'nothing in here bites. probably.' },
