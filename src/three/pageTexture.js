@@ -114,7 +114,7 @@ function cloudLayer(ctx, rnd, cellsX, cellsY, maxAlpha, tone = [150, 118, 66]) {
   ctx.restore()
 }
 
-function paintParchment(ctx, side, rnd, relief = { creases: [], cracks: [], stains: [], tides: [], folds: [] }) {
+function paintParchment(ctx, side, rnd, relief = { creases: [], cracks: [], stains: [], tides: [], folds: [] }, level = 1) {
   // base — pale aged ivory (reference photo tone): near-cream center,
   // aging lives in the clouds, creases and edges, not a uniform yellow.
   const grad = ctx.createRadialGradient(W * (0.42 + rnd() * 0.16), H * (0.35 + rnd() * 0.2), H * 0.2, W / 2, H / 2, H * 0.8)
@@ -124,15 +124,15 @@ function paintParchment(ctx, side, rnd, relief = { creases: [], cracks: [], stai
   ctx.fillStyle = grad
   ctx.fillRect(0, 0, W, H)
 
-  // cloudy age mottling at three scales
-  cloudLayer(ctx, rnd, 6, 8, 0.26)
-  cloudLayer(ctx, rnd, 14, 18, 0.18)
-  cloudLayer(ctx, rnd, 42, 55, 0.1)
+  // cloudy age mottling at three scales — scaled by how hard this page lived
+  cloudLayer(ctx, rnd, 6, 8, Math.min(0.34, 0.26 * level))
+  cloudLayer(ctx, rnd, 14, 18, Math.min(0.26, 0.18 * level))
+  cloudLayer(ctx, rnd, 42, 55, Math.min(0.15, 0.1 * level))
   // pale "cleaner" patches breaking the clouds up
   cloudLayer(ctx, rnd, 9, 12, 0.2, [244, 238, 222])
 
-  // one or two big distinct stain regions (like the reference's tan cloud)
-  const stainCount = 1 + (rnd() > 0.55 ? 1 : 0)
+  // big distinct stain regions — the cleanest pages escape them entirely
+  const stainCount = level < 0.5 ? 0 : (level < 0.8 ? 1 : 1 + (rnd() > 0.55 ? 1 : 0))
   for (let s = 0; s < stainCount; s++) {
     const cx = rnd() > 0.5 ? W * (0.6 + rnd() * 0.35) : W * (0.05 + rnd() * 0.3)
     const cy = H * (0.05 + rnd() * 0.5)
@@ -260,7 +260,7 @@ function paintParchment(ctx, side, rnd, relief = { creases: [], cracks: [], stai
     if (e === 2) return [-10, rnd() * H]
     return [W + 10, rnd() * H]
   }
-  const creaseCount = 9 + Math.floor(rnd() * 5)
+  const creaseCount = Math.max(3, Math.round((9 + Math.floor(rnd() * 5)) * Math.min(1.15, level)))
   for (let i = 0; i < creaseCount; i++) {
     const [x0, y0] = edgePoint()
     const long = rnd() > 0.35
@@ -295,7 +295,7 @@ function paintParchment(ctx, side, rnd, relief = { creases: [], cracks: [], stai
   }
 
   // foxing — the rust-brown speckle of damp-aged paper
-  const speckCount = 26 + Math.floor(rnd() * 30)
+  const speckCount = Math.round((26 + Math.floor(rnd() * 30)) * level)
   for (let i = 0; i < speckCount; i++) {
     const x = rnd() * W
     const y = rnd() * H
@@ -330,10 +330,11 @@ function paintParchment(ctx, side, rnd, relief = { creases: [], cracks: [], stai
     ctx.fillStyle = g
     ctx.fillRect(0, 0, W, H)
   }
-  edge(0, 0, W * 0.1, 0, 0.4 + rnd() * 0.15)
-  edge(W, 0, W * 0.88, 0, 0.42 + rnd() * 0.15)
-  edge(0, 0, 0, H * 0.09, 0.38 + rnd() * 0.12)
-  edge(0, H, 0, H * 0.9, 0.4 + rnd() * 0.12)
+  const ek = 0.55 + 0.45 * Math.min(1, level)
+  edge(0, 0, W * 0.1, 0, (0.4 + rnd() * 0.15) * ek)
+  edge(W, 0, W * 0.88, 0, (0.42 + rnd() * 0.15) * ek)
+  edge(0, 0, 0, H * 0.09, (0.38 + rnd() * 0.12) * ek)
+  edge(0, H, 0, H * 0.9, (0.4 + rnd() * 0.12) * ek)
   // grime blotches hugging the borders (uneven, hand-worn)
   for (let i = 0; i < 26; i++) {
     const along = rnd()
@@ -1452,17 +1453,27 @@ export function renderPageFace(face, side) {
   const regions = []
   const relief = { creases: [], cracks: [], stains: [], tides: [], folds: [] }
 
-  paintParchment(ctx, side, rnd, relief)
+  // damage progression through the book: the title page stays presentable,
+  // the field reports and fun zone have clearly been through something
+  const AGE = {
+    title: 0.35, index: 0.6, welcome: 0.7, end: 0.8,
+    explorer: 0.85, inventor: 0.85, journal: 0.9, blueprint: 1.05,
+    stamps: 0.9, treasure: 0.95, reports: 1.2, scholar: 0.8,
+    chaos: 1.25, letter: 0.9,
+  }
+  const level = AGE[face.theme] ?? 0.85
 
-  // occasional stains — same physical world on every page
-  if (rnd() > 0.55) coffeeRing(ctx, rnd, MARGIN + rnd() * (W - 2 * MARGIN), 200 + rnd() * (H - 500), 46 + rnd() * 40)
-  if (rnd() > 0.5) inkSplat(ctx, rnd, rnd() * W, rnd() * H, 'rgba(45,30,10,0.35)', 0.6 + rnd() * 0.7)
-  if (rnd() > 0.6) fingerprint(ctx, rnd, W * (0.15 + rnd() * 0.7), H * (0.12 + rnd() * 0.76), 1 + rnd() * 0.5)
-  if (rnd() > 0.82) fingerprint(ctx, rnd, W * rnd(), H * rnd(), 0.8, 0.05)
-  if (rnd() > 0.78) burnMark(ctx, rnd, rnd() > 0.5 ? W * 0.06 + rnd() * 40 : W * 0.94 - rnd() * 40, H * (0.2 + rnd() * 0.6), 18 + rnd() * 26)
+  paintParchment(ctx, side, rnd, relief, level)
+
+  // occasional stains — likelihood follows how hard the page lived
+  if (rnd() > 1 - 0.45 * level) coffeeRing(ctx, rnd, MARGIN + rnd() * (W - 2 * MARGIN), 200 + rnd() * (H - 500), 46 + rnd() * 40)
+  if (rnd() > 1 - 0.5 * level) inkSplat(ctx, rnd, rnd() * W, rnd() * H, 'rgba(45,30,10,0.35)', 0.6 + rnd() * 0.7)
+  if (rnd() > 1 - 0.4 * level) fingerprint(ctx, rnd, W * (0.15 + rnd() * 0.7), H * (0.12 + rnd() * 0.76), 1 + rnd() * 0.5)
+  if (rnd() > 1 - 0.18 * level) fingerprint(ctx, rnd, W * rnd(), H * rnd(), 0.8, 0.05)
+  if (rnd() > 1 - 0.22 * level) burnMark(ctx, rnd, rnd() > 0.5 ? W * 0.06 + rnd() * 40 : W * 0.94 - rnd() * 40, H * (0.2 + rnd() * 0.6), 18 + rnd() * 26)
 
   const hasTear = sheetProfile(Math.floor(face.faceIndex / 2)).tears.length > 0
-  if (!hasTear && rnd() > 0.58) foldedCorner(ctx, rnd, rnd() > 0.5 ? 'tr' : 'br', side, relief)
+  if (!hasTear && level > 0.6 && rnd() > 1 - 0.42 * level) foldedCorner(ctx, rnd, rnd() > 0.5 ? 'tr' : 'br', side, relief)
 
   if (face.kind !== 'blank') {
     if (face.theme === 'title') {

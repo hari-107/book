@@ -60,15 +60,19 @@ export default function App() {
           else if (s.navOpen) s.setNavOpen(false)
         }}
       >
-        <color attach="background" args={['#100d09']} />
-        <fog attach="fog" args={['#100d09', 7, 15]} />
+        <color attach="background" args={['#141009']} />
+        <fog attach="fog" args={['#141009', 10, 20]} />
 
-        {/* candlelit study — warm key, cool moonlight fill, ember rim */}
-        <ambientLight intensity={0.5} color="#ffe9c4" />
+        {/* candlelit study — warm key, cool moonlight fill, ember rim.
+            The desk gets enough light to read as a real environment. */}
+        <ambientLight intensity={0.62} color="#ffe9c4" />
+        <hemisphereLight args={['#4a4030', '#141009', 0.4]} />
         <directionalLight position={[2.2, 3.2, 3.6]} intensity={1.6} color="#ffdfae" />
-        <directionalLight position={[-3, 1.4, 2.4]} intensity={0.35} color="#a9bcdf" />
+        <directionalLight position={[-3, 1.4, 2.4]} intensity={0.4} color="#a9bcdf" />
         <directionalLight position={[-1.2, 2.4, -3]} intensity={0.55} color="#ffca7d" />
-        <pointLight position={[1.6, 1.2, 1.8]} intensity={0.5} color="#ffb45e" distance={7} />
+        <pointLight position={[1.6, 1.2, 1.8]} intensity={0.55} color="#ffb45e" distance={7} />
+        {/* a dedicated pool of lamplight across the desk surface */}
+        <spotLight position={[0.8, 2.6, 1.2]} angle={1.0} penumbra={0.9} intensity={0.75} color="#ffcf8e" distance={9} decay={1.6} />
 
         {phase === 'ready' && (
           <Suspense fallback={null}>

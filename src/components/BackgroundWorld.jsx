@@ -54,7 +54,7 @@ function Dust({ count = 110 }) {
       <bufferGeometry>
         <bufferAttribute attach="attributes-position" args={[seeds.arr, 3]} />
       </bufferGeometry>
-      <pointsMaterial size={0.018} color="#cbb695" transparent opacity={0.26} depthWrite={false} sizeAttenuation />
+      <pointsMaterial size={0.018} color="#cbb695" transparent opacity={0.34} depthWrite={false} sizeAttenuation />
     </points>
   )
 }
@@ -89,7 +89,7 @@ function DriftingScraps({ count = 5 }) {
       {items.map((it, i) => (
         <mesh key={i} position={it.base.toArray()}>
           <planeGeometry args={[0.26, 0.33]} />
-          <meshBasicMaterial map={it.tex} transparent opacity={0.4} side={THREE.DoubleSide} depthWrite={false} />
+          <meshBasicMaterial map={it.tex} transparent opacity={0.55} side={THREE.DoubleSide} depthWrite={false} />
         </mesh>
       ))}
     </group>
@@ -106,7 +106,7 @@ function LampFlicker() {
         0.5 + Math.sin(t * 8.7) * 0.045 + Math.sin(t * 21.3) * 0.035 + Math.sin(t * 2.6) * 0.05
     }
   })
-  return <pointLight ref={ref} position={[-2.6, 0.4, 1.6]} intensity={0.5} color="#ffb45e" distance={7} decay={1.7} />
+  return <pointLight ref={ref} position={[-2.6, 0.4, 1.6]} intensity={0.75} color="#ffb45e" distance={8} decay={1.6} />
 }
 
 /** Spark burst for the DO NOT PRESS button. */
@@ -175,7 +175,7 @@ function DeskObjects() {
   const docTex = useMemo(() => scrapDocumentTexture(42), [])
   const letterTex = useMemo(() => letterTexture(), [])
   const compassTex = useMemo(() => compassFaceTexture(), [])
-  const dim = '#7a6c58'
+  const dim = '#9c8c72'
 
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime()
@@ -185,7 +185,7 @@ function DeskObjects() {
       flutterRef.current.rotation.x = -Math.PI / 2 + gust * (0.16 + Math.sin(t * 9) * 0.05)
     }
     // candle: quivering flame, breathing light
-    const flick = 0.58 + Math.sin(t * 9.3) * 0.05 + Math.sin(t * 23.7) * 0.045 + Math.sin(t * 3.1) * 0.05
+    const flick = 0.85 + Math.sin(t * 9.3) * 0.05 + Math.sin(t * 23.7) * 0.045 + Math.sin(t * 3.1) * 0.05
     if (lightRef.current) lightRef.current.intensity = flick
     if (flameRef.current) {
       flameRef.current.scale.set(1 + Math.sin(t * 17) * 0.12, 1 + Math.sin(t * 13.3) * 0.2, 1)
@@ -202,7 +202,7 @@ function DeskObjects() {
       </mesh>
       <mesh ref={flutterRef} rotation={[-Math.PI / 2, 0, -1.1]} position={[2.6, DESK_Y + 0.004, -0.7]}>
         <planeGeometry args={[0.8, 0.6]} />
-        <meshStandardMaterial map={mapTex} roughness={0.95} color="#5e5244" side={THREE.DoubleSide} />
+        <meshStandardMaterial map={mapTex} roughness={0.95} color="#8c7c64" side={THREE.DoubleSide} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, -0.7]} position={[2.35, DESK_Y + 0.002, 0.35]}>
         <planeGeometry args={[0.52, 0.66]} />
@@ -279,7 +279,7 @@ function DeskObjects() {
           <coneGeometry args={[0.016, 0.055, 7]} />
           <meshBasicMaterial color="#ffc466" toneMapped={false} transparent opacity={0.92} />
         </mesh>
-        <pointLight ref={lightRef} position={[0, 0.3, 0]} intensity={0.58} color="#ffb45e" distance={6} decay={1.7} />
+        <pointLight ref={lightRef} position={[0, 0.3, 0]} intensity={0.85} color="#ffb45e" distance={6} decay={1.7} />
       </group>
     </group>
   )
@@ -321,7 +321,7 @@ export default function BackgroundWorld() {
       {/* the desk the book rests on — dark, half-swallowed by the gloom */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, DESK_Y - 0.002, -0.6]}>
         <planeGeometry args={[26, 16]} />
-        <meshStandardMaterial map={wood} roughness={0.94} metalness={0.02} color="#8a7a68" />
+        <meshStandardMaterial map={wood} roughness={0.94} metalness={0.02} color="#a89478" />
       </mesh>
     </>
   )

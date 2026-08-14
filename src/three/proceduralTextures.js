@@ -1155,6 +1155,314 @@ export function themedScrapTexture(kind, seed = 0, w = 240, h = 180) {
   return track(tex)
 }
 
+/** Perforated postage stamp with a scenic engraving. */
+export function postageStampTexture(seed = 0, w = 140, h = 170) {
+  const c = makeCanvas(w, h)
+  const ctx = c.getContext('2d')
+  ctx.fillStyle = ['#c8b184', '#b7a58a', '#a8b096', '#c0a17c'][seed % 4]
+  ctx.fillRect(0, 0, w, h)
+  // perforation — punch scalloped holes around the edge
+  ctx.globalCompositeOperation = 'destination-out'
+  for (let x = 0; x <= w; x += 12) {
+    ctx.beginPath(); ctx.arc(x, 0, 4, 0, Math.PI * 2); ctx.fill()
+    ctx.beginPath(); ctx.arc(x, h, 4, 0, Math.PI * 2); ctx.fill()
+  }
+  for (let y = 0; y <= h; y += 12) {
+    ctx.beginPath(); ctx.arc(0, y, 4, 0, Math.PI * 2); ctx.fill()
+    ctx.beginPath(); ctx.arc(w, y, 4, 0, Math.PI * 2); ctx.fill()
+  }
+  ctx.globalCompositeOperation = 'source-over'
+  // engraved vista
+  ctx.strokeStyle = 'rgba(50,38,20,0.85)'
+  ctx.lineWidth = 2
+  ctx.strokeRect(14, 14, w - 28, h - 28)
+  ctx.beginPath()
+  ctx.moveTo(20, h * 0.62)
+  ctx.lineTo(w * 0.38, h * 0.32)
+  ctx.lineTo(w * 0.55, h * 0.5)
+  ctx.lineTo(w * 0.72, h * 0.36)
+  ctx.lineTo(w - 20, h * 0.62)
+  ctx.stroke()
+  ctx.beginPath()
+  ctx.arc(w * 0.72, h * 0.26, 7, 0, Math.PI * 2)
+  ctx.stroke()
+  for (let y = h * 0.66; y < h * 0.78; y += 4) {
+    ctx.beginPath(); ctx.moveTo(22, y); ctx.lineTo(w - 22, y); ctx.lineWidth = 0.8; ctx.stroke()
+  }
+  ctx.font = '700 20px "Special Elite", monospace'
+  ctx.fillStyle = 'rgba(50,38,20,0.9)'
+  ctx.textAlign = 'center'
+  ctx.fillText(String((seed % 9) + 1), w / 2, h - 24)
+  const tex = new THREE.CanvasTexture(c)
+  tex.colorSpace = THREE.SRGBColorSpace
+  return track(tex)
+}
+
+/** Old postcard — divided back, address lines, corner stamp and postmark. */
+export function postcardTexture(seed = 0, w = 280, h = 190) {
+  const c = makeCanvas(w, h)
+  const ctx = c.getContext('2d')
+  ctx.fillStyle = '#e3d6b2'
+  ctx.fillRect(0, 0, w, h)
+  ctx.strokeStyle = 'rgba(110,80,40,0.6)'
+  ctx.lineWidth = 2
+  ctx.strokeRect(3, 3, w - 6, h - 6)
+  ctx.font = '15px "Special Elite", monospace'
+  ctx.fillStyle = 'rgba(80,58,30,0.85)'
+  ctx.textAlign = 'center'
+  ctx.letterSpacing = '4px'
+  ctx.fillText('POST CARD', w / 2, 24)
+  ctx.letterSpacing = '0px'
+  // divider
+  ctx.beginPath()
+  ctx.moveTo(w / 2, 36)
+  ctx.lineTo(w / 2, h - 14)
+  ctx.lineWidth = 1.4
+  ctx.stroke()
+  // message squiggles (left)
+  ctx.strokeStyle = 'rgba(55,40,20,0.7)'
+  ctx.lineWidth = 1.6
+  for (let y = 52; y < h - 24; y += 18) {
+    ctx.beginPath()
+    let px = 16
+    ctx.moveTo(px, y)
+    const end = w / 2 - 14 - Math.random() * 26
+    while (px < end) {
+      const nx = px + 6 + Math.random() * 8
+      ctx.quadraticCurveTo(px + 3, y - 4 - Math.random() * 4, nx, y + (Math.random() - 0.5) * 3)
+      px = nx
+    }
+    ctx.stroke()
+  }
+  // address lines (right)
+  for (let i = 0; i < 3; i++) {
+    const y = 78 + i * 26
+    ctx.beginPath()
+    ctx.moveTo(w / 2 + 14, y)
+    ctx.lineTo(w - 18, y)
+    ctx.lineWidth = 1
+    ctx.stroke()
+  }
+  // stamp corner + postmark
+  ctx.strokeRect(w - 52, 12, 38, 46)
+  ctx.beginPath()
+  ctx.arc(w - 70, 34, 20, 0, Math.PI * 2)
+  ctx.stroke()
+  const tex = new THREE.CanvasTexture(c)
+  tex.colorSpace = THREE.SRGBColorSpace
+  return track(tex)
+}
+
+/** Newspaper clipping — headline, column rules, faded print, halftone photo. */
+export function newspaperClippingTexture(seed = 0, w = 240, h = 280) {
+  const c = makeCanvas(w, h)
+  const ctx = c.getContext('2d')
+  ctx.fillStyle = '#ddd5be'
+  ctx.fillRect(0, 0, w, h)
+  // ragged cut edges
+  ctx.globalCompositeOperation = 'destination-out'
+  for (let x = 0; x < w; x += 8) {
+    if (Math.random() > 0.6) ctx.fillRect(x, 0, 6, 2 + Math.random() * 3)
+    if (Math.random() > 0.6) ctx.fillRect(x, h - 4, 6, 4)
+  }
+  ctx.globalCompositeOperation = 'source-over'
+  ctx.fillStyle = 'rgba(40,34,24,0.92)'
+  ctx.font = '22px "Base 02", "Special Elite", monospace'
+  ctx.textAlign = 'center'
+  ctx.fillText('DISCOVERY!', w / 2, 32)
+  ctx.strokeStyle = 'rgba(60,52,38,0.6)'
+  ctx.lineWidth = 1.4
+  ctx.beginPath(); ctx.moveTo(12, 44); ctx.lineTo(w - 12, 44); ctx.stroke()
+  // two columns of faded print
+  const col = (x0, x1) => {
+    ctx.lineWidth = 1
+    for (let y = 60; y < h - 16; y += 7) {
+      ctx.strokeStyle = `rgba(60,52,38,${0.28 + Math.random() * 0.22})`
+      ctx.beginPath()
+      ctx.moveTo(x0, y)
+      ctx.lineTo(x1 - Math.random() * 14, y)
+      ctx.stroke()
+    }
+  }
+  col(14, w / 2 - 8)
+  col(w / 2 + 8, w - 14)
+  // halftone photo block in one column
+  ctx.fillStyle = 'rgba(70,62,48,0.5)'
+  ctx.fillRect(w / 2 + 8, 60, w / 2 - 24, 64)
+  for (let y = 62; y < 122; y += 4) {
+    for (let x = w / 2 + 10; x < w - 18; x += 4) {
+      if (Math.random() > 0.5) {
+        ctx.fillStyle = 'rgba(40,34,24,0.4)'
+        ctx.fillRect(x, y, 2, 2)
+      }
+    }
+  }
+  const tex = new THREE.CanvasTexture(c)
+  tex.colorSpace = THREE.SRGBColorSpace
+  return track(tex)
+}
+
+/** Handwritten note on ruled paper — hurried squiggles, one underlined burst. */
+export function handwrittenNoteTexture(seed = 0, w = 250, h = 170) {
+  const c = makeCanvas(w, h)
+  const ctx = c.getContext('2d')
+  ctx.fillStyle = '#e9e0c6'
+  ctx.fillRect(0, 0, w, h)
+  ctx.strokeStyle = 'rgba(120,140,160,0.4)'
+  ctx.lineWidth = 1
+  for (let y = 30; y < h - 10; y += 22) {
+    ctx.beginPath(); ctx.moveTo(8, y); ctx.lineTo(w - 8, y); ctx.stroke()
+  }
+  // red margin
+  ctx.strokeStyle = 'rgba(170,80,70,0.4)'
+  ctx.beginPath(); ctx.moveTo(26, 8); ctx.lineTo(26, h - 8); ctx.stroke()
+  // hurried ink squiggles sitting on the rules
+  ctx.strokeStyle = 'rgba(45,32,16,0.8)'
+  ctx.lineWidth = 1.8
+  for (let r = 0; r < 5; r++) {
+    const y = 26 + r * 22
+    let px = 34
+    ctx.beginPath()
+    ctx.moveTo(px, y)
+    const end = w - 20 - Math.random() * 60
+    while (px < end) {
+      const nx = px + 6 + Math.random() * 9
+      ctx.quadraticCurveTo(px + 3, y - 5 - Math.random() * 5, nx, y + (Math.random() - 0.5) * 3)
+      px = nx
+    }
+    ctx.stroke()
+  }
+  // one emphatic underline
+  ctx.lineWidth = 2.6
+  ctx.beginPath()
+  ctx.moveTo(34, 118)
+  ctx.lineTo(150 + (seed % 40), 121)
+  ctx.stroke()
+  const tex = new THREE.CanvasTexture(c)
+  tex.colorSpace = THREE.SRGBColorSpace
+  return track(tex)
+}
+
+/** Torn map fragment — coastline, hatched sea, dashed route, an X. */
+export function mapFragmentTexture(seed = 0, w = 240, h = 220) {
+  const c = makeCanvas(w, h)
+  const ctx = c.getContext('2d')
+  ctx.clearRect(0, 0, w, h)
+  // torn silhouette
+  ctx.fillStyle = '#d9c896'
+  ctx.beginPath()
+  ctx.moveTo(8, 12)
+  for (let x = 8; x < w - 8; x += 14) ctx.lineTo(x, 4 + Math.random() * 10)
+  for (let y = 12; y < h - 10; y += 16) ctx.lineTo(w - 4 - Math.random() * 10, y)
+  for (let x = w - 8; x > 8; x -= 14) ctx.lineTo(x, h - 4 - Math.random() * 10)
+  for (let y = h - 10; y > 12; y -= 16) ctx.lineTo(4 + Math.random() * 9, y)
+  ctx.closePath()
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(100,70,32,0.55)'
+  ctx.lineWidth = 2
+  ctx.stroke()
+  ctx.save()
+  ctx.clip()
+  // coastline + hatched sea
+  ctx.strokeStyle = 'rgba(60,42,20,0.8)'
+  ctx.lineWidth = 2.2
+  ctx.beginPath()
+  ctx.moveTo(10, h * 0.55)
+  for (let x = 10; x < w; x += 18) {
+    ctx.quadraticCurveTo(x + 6, h * 0.55 + Math.sin(x * 0.08 + seed) * 26, x + 18, h * 0.55 + Math.sin((x + 18) * 0.07) * 24)
+  }
+  ctx.stroke()
+  ctx.lineWidth = 0.8
+  ctx.strokeStyle = 'rgba(60,42,20,0.35)'
+  for (let y = h * 0.66; y < h - 8; y += 8) {
+    ctx.beginPath(); ctx.moveTo(8, y); ctx.lineTo(w - 8, y + Math.random() * 3); ctx.stroke()
+  }
+  // dashed route to an X
+  ctx.setLineDash([6, 6])
+  ctx.strokeStyle = 'rgba(150,45,30,0.85)'
+  ctx.lineWidth = 2.4
+  ctx.beginPath()
+  ctx.moveTo(20, 26)
+  ctx.quadraticCurveTo(w * 0.5, h * 0.2, w * 0.62, h * 0.4)
+  ctx.stroke()
+  ctx.setLineDash([])
+  ctx.lineWidth = 4.5
+  ctx.beginPath()
+  ctx.moveTo(w * 0.62 - 9, h * 0.4 - 9); ctx.lineTo(w * 0.62 + 9, h * 0.4 + 9)
+  ctx.moveTo(w * 0.62 + 9, h * 0.4 - 9); ctx.lineTo(w * 0.62 - 9, h * 0.4 + 9)
+  ctx.stroke()
+  ctx.restore()
+  const tex = new THREE.CanvasTexture(c)
+  tex.colorSpace = THREE.SRGBColorSpace
+  return track(tex)
+}
+
+/** Pencil sketch card — a quick field drawing on aged paper. */
+export function sketchCardTexture(seed = 0, w = 210, h = 160) {
+  const c = makeCanvas(w, h)
+  const ctx = c.getContext('2d')
+  ctx.fillStyle = '#e6dcc0'
+  ctx.fillRect(0, 0, w, h)
+  ctx.strokeStyle = 'rgba(70,64,56,0.75)'
+  ctx.lineWidth = 1.8
+  ctx.lineCap = 'round'
+  const kind = seed % 4
+  if (kind === 0) {
+    // gear
+    const cx = w / 2, cy = h / 2, r = 38
+    ctx.beginPath()
+    for (let i = 0; i < 9; i++) {
+      const a0 = (i / 9) * Math.PI * 2
+      const a1 = ((i + 0.5) / 9) * Math.PI * 2
+      ctx.lineTo(cx + Math.cos(a0) * r, cy + Math.sin(a0) * r)
+      ctx.lineTo(cx + Math.cos(a1) * r * 0.72, cy + Math.sin(a1) * r * 0.72)
+    }
+    ctx.closePath(); ctx.stroke()
+    ctx.beginPath(); ctx.arc(cx, cy, 10, 0, Math.PI * 2); ctx.stroke()
+  } else if (kind === 1) {
+    // mountains + route
+    ctx.beginPath()
+    ctx.moveTo(14, h - 30)
+    ctx.lineTo(w * 0.35, 34)
+    ctx.lineTo(w * 0.52, h - 46)
+    ctx.lineTo(w * 0.68, 52)
+    ctx.lineTo(w - 14, h - 30)
+    ctx.stroke()
+    ctx.setLineDash([4, 5])
+    ctx.beginPath(); ctx.moveTo(20, h - 22); ctx.quadraticCurveTo(w / 2, h - 40, w - 24, h - 26); ctx.stroke()
+    ctx.setLineDash([])
+  } else if (kind === 2) {
+    // compass
+    const cx = w / 2, cy = h / 2
+    ctx.beginPath(); ctx.arc(cx, cy, 42, 0, Math.PI * 2); ctx.stroke()
+    ctx.beginPath(); ctx.arc(cx, cy, 32, 0, Math.PI * 2); ctx.stroke()
+    ctx.beginPath()
+    ctx.moveTo(cx, cy - 26); ctx.lineTo(cx + 7, cy); ctx.lineTo(cx, cy + 26); ctx.lineTo(cx - 7, cy)
+    ctx.closePath(); ctx.stroke()
+  } else {
+    // the robot again (it gets everywhere)
+    const cx = w / 2, cy = h / 2 + 10, s = 26
+    ctx.strokeRect(cx - s * 0.45, cy - s * 1.5, s * 0.9, s * 0.7)
+    ctx.strokeRect(cx - s * 0.55, cy - s * 0.7, s * 1.1, s)
+    ctx.beginPath(); ctx.moveTo(cx - s * 0.55, cy - s * 0.4); ctx.lineTo(cx - s, cy - s * 0.8); ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(cx + s * 0.55, cy - s * 0.4); ctx.lineTo(cx + s, cy - s * 0.2); ctx.stroke()
+  }
+  // corner annotation squiggle
+  ctx.lineWidth = 1.2
+  ctx.beginPath()
+  let px = w - 74
+  ctx.moveTo(px, h - 14)
+  while (px < w - 16) {
+    const nx = px + 5 + Math.random() * 6
+    ctx.quadraticCurveTo(px + 2, h - 18 - Math.random() * 4, nx, h - 14)
+    px = nx
+  }
+  ctx.stroke()
+  const tex = new THREE.CanvasTexture(c)
+  tex.colorSpace = THREE.SRGBColorSpace
+  return track(tex)
+}
+
 const SCRAP_SCRIBBLES = ['✗', '→', '?', '△', '§', '#', '!']
 
 /** A tumbling background paper scrap with a scribble on it. */

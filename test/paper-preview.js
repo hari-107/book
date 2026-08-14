@@ -31,18 +31,36 @@ async function main() {
     /* proceed with fallbacks */
   }
 
-  // paper relief first (above the fold): torn face color + its normal map
-  const f4 = renderPageFace(FACES[4], 'right')
-  add(f4.texture.image, 'face 4 color — about-2 (torn)')
-  add(f4.normalTexture.image, 'face 4 — paper relief normals')
+  // the physical object library, above the fold
+  const objects = await import('../src/three/proceduralTextures.js')
+  const strip = [
+    [objects.postageStampTexture(2), 'postage stamp'],
+    [objects.postcardTexture(1), 'postcard'],
+    [objects.newspaperClippingTexture(0), 'newspaper clipping'],
+    [objects.handwrittenNoteTexture(3), 'handwritten note'],
+    [objects.mapFragmentTexture(5), 'map fragment'],
+    [objects.sketchCardTexture(0), 'sketch: gear'],
+    [objects.sketchCardTexture(3), 'sketch: robot'],
+  ]
+  for (const [tex, label] of strip) {
+    tex.image.style.width = '12%'
+    tex.image.style.margin = '0.5%'
+    tex.image.style.boxShadow = '0 6px 20px rgba(0,0,0,0.6)'
+    document.body.appendChild(tex.image)
+    const l = document.createElement('div')
+    l.className = 'lbl'
+    l.style.width = '12%'
+    l.textContent = label
+    document.body.appendChild(l)
+  }
 
+  // a clean page (title) vs a filthy one (fun zone) — damage progression
+  const f1 = renderPageFace(FACES[1], 'left')
+  add(f1.texture.image, 'face 1 — title (clean)')
+  const f20 = renderPageFace(FACES[20], 'right')
+  add(f20.texture.image, 'face 20 — fun zone (chaos level)')
   const f2 = renderPageFace(FACES[2], 'right')
-  add(f2.texture.image, 'face 2 — index')
-
-  // the embossed front-cover leather (color map) + its normal map
-  const leather = agedLeatherMaps({ emboss: true, owner: bookMeta.owner, title: bookMeta.title })
-  add(leather.map.image, 'front cover leather — color', true)
-  add(leather.normalMap.image, 'front cover leather — normals', true)
+  add(f2.texture.image, 'face 2 — index (moderate)')
 
   document.getElementById('status').textContent = 'rendered ✓'
 }
