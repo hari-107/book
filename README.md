@@ -95,6 +95,15 @@ src/data/bookContent.js
 > marker with your own details. (The owner name and title-page wording come
 > from the project owner's mockup.)
 
+## Fonts
+
+Display/stencil face: **Base 02** by Zone Erogene, embedded verbatim as a
+data-URI stylesheet (`src/base02-font.css`). Free for personal,
+non-commercial use — see `public/fonts/Base02-LICENSE-Readme.txt` (the author
+asks for a donation for commercial use and an email for redistribution).
+Supporting faces via Google Fonts: Special Elite (typewriter), Caveat
+(handwriting), IM Fell English (old book), Rye (fallback).
+
 ## Project structure
 
 ```

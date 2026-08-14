@@ -26,7 +26,7 @@ const H = PAGE_TEX_H
 const MARGIN = 118
 
 // ---- fonts ----------------------------------------------------------------
-export const TITLE_FONT = (px) => `${px}px "Rye", "IM Fell English SC", serif`
+export const TITLE_FONT = (px) => `${px}px "Base 02", "Rye", "IM Fell English SC", serif`
 export const TYPE_FONT = (px) => `${px}px "Special Elite", "Courier New", monospace`
 export const HAND_FONT = (px, weight = 600) => `${weight} ${px}px "Caveat", cursive`
 export const FELL_FONT = (px, italic = false) => `${italic ? 'italic ' : ''}${px}px "IM Fell English", Georgia, serif`
@@ -438,7 +438,7 @@ function rubberStamp(ctx, rnd, text, x, y, rot, color = INK_RED) {
   ctx.strokeStyle = color
   ctx.fillStyle = color
   ctx.lineWidth = 4
-  ctx.font = TYPE_FONT(30)
+  ctx.font = `30px "Base 02", "Special Elite", monospace`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   const tw = ctx.measureText(text).width

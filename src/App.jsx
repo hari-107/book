@@ -27,6 +27,7 @@ export default function App() {
     async function preload() {
       try {
         await Promise.all([
+          document.fonts.load('64px "Base 02"'),
           document.fonts.load('64px "Rye"'),
           document.fonts.load('30px "Special Elite"'),
           document.fonts.load('600 44px "Caveat"'),

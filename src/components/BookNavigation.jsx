@@ -42,7 +42,7 @@ function buildNavTexture() {
   ctx.strokeRect(40, 40, CW - 80, CH - 80)
 
   ctx.fillStyle = INK
-  ctx.font = '50px "Rye", "IM Fell English SC", serif'
+  ctx.font = '48px "Base 02", "Rye", "IM Fell English SC", serif'
   ctx.textAlign = 'center'
   ctx.fillText('MAP OF THE BOOK', CW / 2, 122)
   ctx.strokeStyle = GOLD

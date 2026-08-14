@@ -50,7 +50,7 @@ function stampTexture(text) {
   ctx.strokeRect(10, 14, c.width - 20, c.height - 28)
   ctx.lineWidth = 2
   ctx.strokeRect(22, 26, c.width - 44, c.height - 52)
-  ctx.font = `${text.length > 8 ? 40 : 52}px "Special Elite", monospace`
+  ctx.font = `${text.length > 8 ? 40 : 52}px "Base 02", "Special Elite", monospace`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   ctx.fillText(text, c.width / 2, c.height / 2 + 3)

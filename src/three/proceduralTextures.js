@@ -369,9 +369,9 @@ export function agedLeatherMaps({ emboss = false, owner = '', title = '', size =
     const nameDraw = (ctx2) => {
       ctx2.textAlign = 'center'
       ctx2.textBaseline = 'middle'
-      ctx2.font = `${size * 0.062}px "IM Fell English SC", serif`
+      ctx2.font = `${size * 0.06}px "Base 02", "IM Fell English SC", serif`
       ctx2.fillText(owner, cx, size * 0.585)
-      ctx2.font = `${size * 0.036}px "IM Fell English SC", serif`
+      ctx2.font = `${size * 0.034}px "Base 02", "IM Fell English SC", serif`
       const prev = ctx2.letterSpacing
       ctx2.letterSpacing = `${size * 0.014}px`
       ctx2.fillText(title, cx + size * 0.007, size * 0.675)
@@ -652,7 +652,7 @@ export function spineTexture(title, w = 128, h = 512) {
   ctx.translate(w / 2, h / 2)
   ctx.rotate(Math.PI / 2)
   ctx.letterSpacing = '6px'
-  ctx.font = `${w * 0.3}px "IM Fell English SC", serif`
+  ctx.font = `${w * 0.28}px "Base 02", "IM Fell English SC", serif`
   // dark impression, then patchy faded gilt
   ctx.fillStyle = 'rgba(10,5,2,0.7)'
   ctx.fillText(title, 1, 1)
