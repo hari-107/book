@@ -97,7 +97,7 @@ function cloudLayer(ctx, rnd, cellsX, cellsY, maxAlpha, tone = [150, 118, 66]) {
   const tiny = document.createElement('canvas')
   tiny.width = cellsX
   tiny.height = cellsY
-  const tctx = tiny.getContext('2d')
+  const tctx = tiny.getContext('2d', { willReadFrequently: true })
   const img = tctx.createImageData(cellsX, cellsY)
   for (let i = 0; i < cellsX * cellsY; i++) {
     const a = Math.pow(rnd(), 2.6) * maxAlpha * 255
@@ -1347,7 +1347,7 @@ function buildHeightCanvas(face, side, relief, rnd) {
   const c = document.createElement('canvas')
   c.width = HW
   c.height = HH
-  const hctx = c.getContext('2d')
+  const hctx = c.getContext('2d', { willReadFrequently: true })
   hctx.fillStyle = '#808080'
   hctx.fillRect(0, 0, HW, HH)
 
@@ -1448,7 +1448,7 @@ export function renderPageFace(face, side) {
   const canvas = document.createElement('canvas')
   canvas.width = W
   canvas.height = H
-  const ctx = canvas.getContext('2d')
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })
   const rnd = mulberry32(seedFrom(face.id))
   const regions = []
   const relief = { creases: [], cracks: [], stains: [], tides: [], folds: [] }
@@ -1515,7 +1515,7 @@ export function renderEndpaper(side) {
   const canvas = document.createElement('canvas')
   canvas.width = W
   canvas.height = H
-  const ctx = canvas.getContext('2d')
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })
   const rnd = mulberry32(seedFrom('endpaper-' + side))
   paintParchment(ctx, side, rnd)
   // old bookplate ghost

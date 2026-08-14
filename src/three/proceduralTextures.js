@@ -48,7 +48,7 @@ function noiseField(w, h, rand = Math.random) {
 
 function upscaleNoise(ctx, W2, H2, cellsX, cellsY, tone, maxAlpha, rand = Math.random) {
   const tiny = makeCanvas(cellsX, cellsY)
-  const tctx = tiny.getContext('2d')
+  const tctx = tiny.getContext('2d', { willReadFrequently: true })
   const img = tctx.createImageData(cellsX, cellsY)
   for (let i = 0; i < cellsX * cellsY; i++) {
     img.data[i * 4] = tone[0]
@@ -67,13 +67,13 @@ function upscaleNoise(ctx, W2, H2, cellsX, cellsY, tone, maxAlpha, rand = Math.r
 export function sobelNormalFromCanvas(heightCanvas, strength = 2.4) {
   const w = heightCanvas.width
   const h = heightCanvas.height
-  const src = heightCanvas.getContext('2d').getImageData(0, 0, w, h).data
+  const src = heightCanvas.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, w, h).data
   const lum = (x, y) => {
     const i = (((y + h) % h) * w + ((x + w) % w)) * 4
     return (src[i] + src[i + 1] + src[i + 2]) / 765
   }
   const out = makeCanvas(w, h)
-  const octx = out.getContext('2d')
+  const octx = out.getContext('2d', { willReadFrequently: true })
   const img = octx.createImageData(w, h)
   const d = img.data
   for (let y = 0; y < h; y++) {
@@ -105,11 +105,11 @@ export function sobelNormalFromCanvas(heightCanvas, strength = 2.4) {
  */
 export function agedLeatherMaps({ emboss = false, owner = '', title = '', size = 1024 } = {}) {
   const color = makeCanvas(size, size)
-  const cctx = color.getContext('2d')
+  const cctx = color.getContext('2d', { willReadFrequently: true })
   const height = makeCanvas(size, size)
-  const hctx = height.getContext('2d')
+  const hctx = height.getContext('2d', { willReadFrequently: true })
   const rough = makeCanvas(size, size)
-  const rctx = rough.getContext('2d')
+  const rctx = rough.getContext('2d', { willReadFrequently: true })
 
   // --- base -----------------------------------------------------------
   cctx.fillStyle = '#38220f'
@@ -299,7 +299,7 @@ export function agedLeatherMaps({ emboss = false, owner = '', title = '', size =
     }
     const leafRemnants = (draw, alpha = 0.55, wear = 130) => {
       const tmp = makeCanvas(size, size)
-      const tctx = tmp.getContext('2d')
+      const tctx = tmp.getContext('2d', { willReadFrequently: true })
       tctx.strokeStyle = `rgba(190,150,80,${alpha})`
       tctx.fillStyle = `rgba(190,150,80,${alpha})`
       draw(tctx)
@@ -400,7 +400,7 @@ export function agedLeatherMaps({ emboss = false, owner = '', title = '', size =
 /** Worn brown leather: mottled, scratched, stitched, sun-bleached at the edges. */
 export function leatherColorTexture(size = 512) {
   const c = makeCanvas(size, size)
-  const ctx = c.getContext('2d')
+  const ctx = c.getContext('2d', { willReadFrequently: true })
   ctx.fillStyle = LEATHER
   ctx.fillRect(0, 0, size, size)
 
@@ -483,7 +483,7 @@ export function grainNormalTexture(size = 256, strength = 1.8) {
   const h = size
   const field = noiseField(w, h)
   const c = makeCanvas(w, h)
-  const ctx = c.getContext('2d')
+  const ctx = c.getContext('2d', { willReadFrequently: true })
   const img = ctx.createImageData(w, h)
   const d = img.data
   for (let y = 0; y < h; y++) {
@@ -514,7 +514,7 @@ export function grainNormalTexture(size = 256, strength = 1.8) {
 /** Aged paper tone for endpapers and block faces. */
 export function paperColorTexture(size = 256) {
   const c = makeCanvas(size, size)
-  const ctx = c.getContext('2d')
+  const ctx = c.getContext('2d', { willReadFrequently: true })
   ctx.fillStyle = '#e0d4b4'
   ctx.fillRect(0, 0, size, size)
   const img = ctx.getImageData(0, 0, size, size)
@@ -535,7 +535,7 @@ export function paperColorTexture(size = 256) {
 /** Irregular, darkened striations for the exposed page-block edges — old, uneven, slightly water-stained. */
 export function pageEdgeTexture(w = 64, h = 256) {
   const c = makeCanvas(w, h)
-  const ctx = c.getContext('2d')
+  const ctx = c.getContext('2d', { willReadFrequently: true })
   ctx.fillStyle = '#d9c69c'
   ctx.fillRect(0, 0, w, h)
   for (let y = 0; y < h; y += 2) {
@@ -565,7 +565,7 @@ export function pageEdgeTexture(w = 64, h = 256) {
 /** Wide desk wood — dark planks with grain streaks. */
 export function woodTexture(w = 512, h = 512) {
   const c = makeCanvas(w, h)
-  const ctx = c.getContext('2d')
+  const ctx = c.getContext('2d', { willReadFrequently: true })
   ctx.fillStyle = '#2a1c10'
   ctx.fillRect(0, 0, w, h)
   for (let y = 0; y < h; y += 2) {
@@ -594,7 +594,7 @@ export function woodTexture(w = 512, h = 512) {
 /** Compass-rose cover emblem with worn gilt ring (transparent background). */
 export function emblemTexture(_monogram, size = 512) {
   const c = makeCanvas(size, size)
-  const ctx = c.getContext('2d')
+  const ctx = c.getContext('2d', { willReadFrequently: true })
   const cx = size / 2
   ctx.clearRect(0, 0, size, size)
   ctx.strokeStyle = GOLD
@@ -644,7 +644,7 @@ export function emblemTexture(_monogram, size = 512) {
 /** Spine title — worn blind emboss with faded gilt, rendered vertically (transparent background). */
 export function spineTexture(title, w = 128, h = 512) {
   const c = makeCanvas(w, h)
-  const ctx = c.getContext('2d')
+  const ctx = c.getContext('2d', { willReadFrequently: true })
   ctx.clearRect(0, 0, w, h)
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
@@ -678,7 +678,7 @@ export function spineTexture(title, w = 128, h = 512) {
  */
 export function placeholderImageTexture(label, seed = 0, w = 640, h = 520) {
   const c = makeCanvas(w, h)
-  const ctx = c.getContext('2d')
+  const ctx = c.getContext('2d', { willReadFrequently: true })
   // aged polaroid frame
   ctx.fillStyle = '#efe4c8'
   ctx.fillRect(0, 0, w, h)
@@ -739,7 +739,7 @@ export function placeholderImageTexture(label, seed = 0, w = 640, h = 520) {
 /** Caption strip texture for a focused photo — torn label style. */
 export function captionTexture(text, w = 768, h = 170) {
   const c = makeCanvas(w, h)
-  const ctx = c.getContext('2d')
+  const ctx = c.getContext('2d', { willReadFrequently: true })
   ctx.fillStyle = 'rgba(38,28,14,0.92)'
   roundRect(ctx, 0, 0, w, h, 14)
   ctx.fill()
@@ -761,7 +761,7 @@ export function captionTexture(text, w = 768, h = 170) {
 /** Semi-transparent aged tape strip. */
 export function tapeTexture(w = 128, h = 48) {
   const c = makeCanvas(w, h)
-  const ctx = c.getContext('2d')
+  const ctx = c.getContext('2d', { willReadFrequently: true })
   ctx.fillStyle = 'rgba(230,215,170,0.55)'
   ctx.fillRect(0, 0, w, h)
   for (let i = 0; i < 40; i++) {
@@ -783,7 +783,7 @@ export function tapeTexture(w = 128, h = 48) {
 /** Soft radial shadow blob — used under photos, scraps and artifacts. */
 export function shadowBlobTexture(size = 128) {
   const c = makeCanvas(size, size)
-  const ctx = c.getContext('2d')
+  const ctx = c.getContext('2d', { willReadFrequently: true })
   const g = ctx.createRadialGradient(size / 2, size / 2, size * 0.05, size / 2, size / 2, size * 0.5)
   g.addColorStop(0, 'rgba(20,10,2,0.75)')
   g.addColorStop(0.7, 'rgba(20,10,2,0.3)')
@@ -797,7 +797,7 @@ export function shadowBlobTexture(size = 128) {
 /** A torn old document with faux handwriting, stains and a burnt corner — taped onto pages. */
 export function scrapDocumentTexture(seed = 0, w = 300, h = 380) {
   const c = makeCanvas(w, h)
-  const ctx = c.getContext('2d')
+  const ctx = c.getContext('2d', { willReadFrequently: true })
   ctx.clearRect(0, 0, w, h)
   // torn silhouette
   ctx.fillStyle = '#e4d7b4'
@@ -855,7 +855,7 @@ export function scrapDocumentTexture(seed = 0, w = 300, h = 380) {
 /** Handwritten caption strip for a photograph (transparent background). */
 export function photoCaptionTexture(text, w = 512, h = 96) {
   const c = makeCanvas(w, h)
-  const ctx = c.getContext('2d')
+  const ctx = c.getContext('2d', { willReadFrequently: true })
   ctx.clearRect(0, 0, w, h)
   ctx.fillStyle = 'rgba(55,38,18,0.9)'
   ctx.font = '600 40px "Caveat", cursive'
@@ -872,7 +872,7 @@ export function photoCaptionTexture(text, w = 512, h = 96) {
 /** A small desk map — coastline, dashed route, X marks the spot. */
 export function deskMapTexture(w = 512, h = 384) {
   const c = makeCanvas(w, h)
-  const ctx = c.getContext('2d')
+  const ctx = c.getContext('2d', { willReadFrequently: true })
   ctx.fillStyle = '#dbc998'
   ctx.fillRect(0, 0, w, h)
   for (let i = 0; i < 300; i++) {
@@ -940,7 +940,7 @@ export function deskMapTexture(w = 512, h = 384) {
 /** An old letter/envelope for the desk. */
 export function letterTexture(w = 384, h = 256) {
   const c = makeCanvas(w, h)
-  const ctx = c.getContext('2d')
+  const ctx = c.getContext('2d', { willReadFrequently: true })
   ctx.fillStyle = '#e6dab6'
   ctx.fillRect(0, 0, w, h)
   ctx.strokeStyle = 'rgba(110,80,40,0.5)'
@@ -982,7 +982,7 @@ export function letterTexture(w = 384, h = 256) {
 /** Compass face for the desk compass. */
 export function compassFaceTexture(size = 256) {
   const c = makeCanvas(size, size)
-  const ctx = c.getContext('2d')
+  const ctx = c.getContext('2d', { willReadFrequently: true })
   const cx = size / 2
   ctx.fillStyle = '#e8dcc0'
   ctx.beginPath()
@@ -1034,7 +1034,7 @@ export function compassFaceTexture(size = 256) {
  */
 export function themedScrapTexture(kind, seed = 0, w = 240, h = 180) {
   const c = makeCanvas(w, h)
-  const ctx = c.getContext('2d')
+  const ctx = c.getContext('2d', { willReadFrequently: true })
   const rnd = () => Math.random()
   switch (kind) {
     case 'graph': {
@@ -1158,7 +1158,7 @@ export function themedScrapTexture(kind, seed = 0, w = 240, h = 180) {
 /** Perforated postage stamp with a scenic engraving. */
 export function postageStampTexture(seed = 0, w = 140, h = 170) {
   const c = makeCanvas(w, h)
-  const ctx = c.getContext('2d')
+  const ctx = c.getContext('2d', { willReadFrequently: true })
   ctx.fillStyle = ['#c8b184', '#b7a58a', '#a8b096', '#c0a17c'][seed % 4]
   ctx.fillRect(0, 0, w, h)
   // perforation — punch scalloped holes around the edge
@@ -1201,7 +1201,7 @@ export function postageStampTexture(seed = 0, w = 140, h = 170) {
 /** Old postcard — divided back, address lines, corner stamp and postmark. */
 export function postcardTexture(seed = 0, w = 280, h = 190) {
   const c = makeCanvas(w, h)
-  const ctx = c.getContext('2d')
+  const ctx = c.getContext('2d', { willReadFrequently: true })
   ctx.fillStyle = '#e3d6b2'
   ctx.fillRect(0, 0, w, h)
   ctx.strokeStyle = 'rgba(110,80,40,0.6)'
@@ -1256,7 +1256,7 @@ export function postcardTexture(seed = 0, w = 280, h = 190) {
 /** Newspaper clipping — headline, column rules, faded print, halftone photo. */
 export function newspaperClippingTexture(seed = 0, w = 240, h = 280) {
   const c = makeCanvas(w, h)
-  const ctx = c.getContext('2d')
+  const ctx = c.getContext('2d', { willReadFrequently: true })
   ctx.fillStyle = '#ddd5be'
   ctx.fillRect(0, 0, w, h)
   // ragged cut edges
@@ -1305,7 +1305,7 @@ export function newspaperClippingTexture(seed = 0, w = 240, h = 280) {
 /** Handwritten note on ruled paper — hurried squiggles, one underlined burst. */
 export function handwrittenNoteTexture(seed = 0, w = 250, h = 170) {
   const c = makeCanvas(w, h)
-  const ctx = c.getContext('2d')
+  const ctx = c.getContext('2d', { willReadFrequently: true })
   ctx.fillStyle = '#e9e0c6'
   ctx.fillRect(0, 0, w, h)
   ctx.strokeStyle = 'rgba(120,140,160,0.4)'
@@ -1346,7 +1346,7 @@ export function handwrittenNoteTexture(seed = 0, w = 250, h = 170) {
 /** Torn map fragment — coastline, hatched sea, dashed route, an X. */
 export function mapFragmentTexture(seed = 0, w = 240, h = 220) {
   const c = makeCanvas(w, h)
-  const ctx = c.getContext('2d')
+  const ctx = c.getContext('2d', { willReadFrequently: true })
   ctx.clearRect(0, 0, w, h)
   // torn silhouette
   ctx.fillStyle = '#d9c896'
@@ -1400,7 +1400,7 @@ export function mapFragmentTexture(seed = 0, w = 240, h = 220) {
 /** Pencil sketch card — a quick field drawing on aged paper. */
 export function sketchCardTexture(seed = 0, w = 210, h = 160) {
   const c = makeCanvas(w, h)
-  const ctx = c.getContext('2d')
+  const ctx = c.getContext('2d', { willReadFrequently: true })
   ctx.fillStyle = '#e6dcc0'
   ctx.fillRect(0, 0, w, h)
   ctx.strokeStyle = 'rgba(70,64,56,0.75)'
@@ -1468,7 +1468,7 @@ const SCRAP_SCRIBBLES = ['✗', '→', '?', '△', '§', '#', '!']
 /** A tumbling background paper scrap with a scribble on it. */
 export function paperScrapTexture(seed = 0, w = 128, h = 160) {
   const c = makeCanvas(w, h)
-  const ctx = c.getContext('2d')
+  const ctx = c.getContext('2d', { willReadFrequently: true })
   ctx.fillStyle = ['#e2cfa0', '#d9c28e', '#e8d8b0'][seed % 3]
   // torn silhouette
   ctx.beginPath()
@@ -1501,7 +1501,7 @@ export function paperScrapTexture(seed = 0, w = 128, h = 160) {
 /** A glowing handwritten word / hacker glyph for the living background. */
 export function wordTexture(text, color = '#e8c87a', w = 512, h = 160) {
   const c = makeCanvas(w, h)
-  const ctx = c.getContext('2d')
+  const ctx = c.getContext('2d', { willReadFrequently: true })
   ctx.clearRect(0, 0, w, h)
   ctx.shadowColor = color
   ctx.shadowBlur = 18
@@ -1518,7 +1518,7 @@ export function wordTexture(text, color = '#e8c87a', w = 512, h = 160) {
 /** Faint line-art gear for the deep background. */
 export function gearTexture(size = 256, teeth = 12) {
   const c = makeCanvas(size, size)
-  const ctx = c.getContext('2d')
+  const ctx = c.getContext('2d', { willReadFrequently: true })
   const cx = size / 2
   const rOuter = size * 0.46
   const rInner = size * 0.34
