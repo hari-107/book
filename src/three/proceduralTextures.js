@@ -1026,6 +1026,135 @@ export function compassFaceTexture(size = 256) {
   return track(tex)
 }
 
+/**
+ * Themed physical fragments stuck onto pages — the scrapbook layer.
+ * kinds: 'graph' (engineer's grid + sketch), 'blueprint' (blue grid plan),
+ * 'classified' (redacted strip), 'sticky' (aged sticky note), 'ticket'
+ * (expedition ticket stub with perforation).
+ */
+export function themedScrapTexture(kind, seed = 0, w = 240, h = 180) {
+  const c = makeCanvas(w, h)
+  const ctx = c.getContext('2d')
+  const rnd = () => Math.random()
+  switch (kind) {
+    case 'graph': {
+      ctx.fillStyle = '#e7dfc8'
+      ctx.fillRect(0, 0, w, h)
+      ctx.strokeStyle = 'rgba(120,140,150,0.35)'
+      ctx.lineWidth = 1
+      for (let x = 0; x <= w; x += 14) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke() }
+      for (let y = 0; y <= h; y += 14) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke() }
+      // pencil sketch: a bracketed mechanism
+      ctx.strokeStyle = 'rgba(60,55,50,0.8)'
+      ctx.lineWidth = 2
+      ctx.strokeRect(w * 0.2, h * 0.3, w * 0.3, h * 0.35)
+      ctx.beginPath()
+      ctx.arc(w * 0.68, h * 0.48, h * 0.18, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.beginPath()
+      ctx.moveTo(w * 0.5, h * 0.48)
+      ctx.lineTo(w * 0.5 + h * 0.18, h * 0.48)
+      ctx.stroke()
+      ctx.font = '600 16px "Caveat", cursive'
+      ctx.fillStyle = 'rgba(60,55,50,0.85)'
+      ctx.fillText('fig. ' + ((seed % 7) + 1), w * 0.2, h * 0.24)
+      break
+    }
+    case 'blueprint': {
+      ctx.fillStyle = '#2c4a66'
+      ctx.fillRect(0, 0, w, h)
+      ctx.strokeStyle = 'rgba(200,225,255,0.3)'
+      ctx.lineWidth = 1
+      for (let x = 0; x <= w; x += 16) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke() }
+      for (let y = 0; y <= h; y += 16) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke() }
+      ctx.strokeStyle = 'rgba(235,245,255,0.9)'
+      ctx.lineWidth = 2
+      ctx.strokeRect(w * 0.15, h * 0.25, w * 0.4, h * 0.42)
+      ctx.beginPath()
+      ctx.moveTo(w * 0.55, h * 0.46)
+      ctx.lineTo(w * 0.78, h * 0.46)
+      ctx.stroke()
+      ctx.strokeRect(w * 0.72, h * 0.34, w * 0.14, h * 0.24)
+      ctx.font = '12px "Special Elite", monospace'
+      ctx.fillStyle = 'rgba(235,245,255,0.9)'
+      ctx.fillText('PLAN B', w * 0.15, h * 0.18)
+      break
+    }
+    case 'classified': {
+      ctx.fillStyle = '#ddd0ac'
+      ctx.fillRect(0, 0, w, h)
+      ctx.font = '20px "Special Elite", monospace'
+      ctx.fillStyle = 'rgba(150,40,30,0.8)'
+      ctx.fillText('CLASSIFIED', 16, 32)
+      // typed lines with redactions
+      for (let y = 58; y < h - 16; y += 24) {
+        ctx.fillStyle = 'rgba(60,48,30,0.6)'
+        ctx.fillRect(16, y, w - 32, 2)
+        if (Math.random() > 0.4) {
+          ctx.fillStyle = 'rgba(25,18,10,0.9)'
+          ctx.fillRect(16 + Math.random() * 80, y - 12, 40 + Math.random() * 80, 16)
+        }
+      }
+      break
+    }
+    case 'sticky': {
+      ctx.clearRect(0, 0, w, h)
+      ctx.fillStyle = '#e8d489'
+      ctx.fillRect(6, 6, w - 12, h - 12)
+      const g = ctx.createLinearGradient(0, h - 40, 0, h)
+      g.addColorStop(0, 'rgba(0,0,0,0)')
+      g.addColorStop(1, 'rgba(120,95,40,0.25)')
+      ctx.fillStyle = g
+      ctx.fillRect(6, 6, w - 12, h - 12)
+      ctx.font = '600 26px "Caveat", cursive'
+      ctx.fillStyle = 'rgba(60,45,20,0.9)'
+      const notes = ['fix this!!', 'genius idea →', 'do NOT forget', 'why??', 'ship it.', 'needs coffee', 'ask past me']
+      ctx.fillText(notes[seed % notes.length], 18, h / 2)
+      break
+    }
+    case 'ticket': {
+      ctx.clearRect(0, 0, w, h)
+      ctx.fillStyle = '#d9c390'
+      ctx.fillRect(4, h * 0.2, w - 8, h * 0.6)
+      // perforation
+      ctx.fillStyle = 'rgba(24,20,16,1)'
+      for (let y = h * 0.2; y < h * 0.8; y += 10) {
+        ctx.beginPath()
+        ctx.arc(w * 0.72, y + 4, 2.6, 0, Math.PI * 2)
+        ctx.fill()
+      }
+      ctx.strokeStyle = 'rgba(90,65,30,0.6)'
+      ctx.lineWidth = 2
+      ctx.strokeRect(4, h * 0.2, w - 8, h * 0.6)
+      ctx.font = '16px "Special Elite", monospace'
+      ctx.fillStyle = 'rgba(70,50,25,0.9)'
+      ctx.fillText('EXPEDITION', 16, h * 0.42)
+      ctx.font = '13px "Special Elite", monospace'
+      ctx.fillText('ADMIT ONE', 16, h * 0.62)
+      ctx.save()
+      ctx.translate(w * 0.86, h / 2)
+      ctx.rotate(Math.PI / 2)
+      ctx.font = '14px "Special Elite", monospace'
+      ctx.textAlign = 'center'
+      ctx.fillText(String(1000 + ((seed * 37) % 9000)), 0, 0)
+      ctx.restore()
+      break
+    }
+    default: {
+      ctx.fillStyle = '#e2cfa0'
+      ctx.fillRect(0, 0, w, h)
+    }
+  }
+  // grime pass for all
+  for (let i = 0; i < 120; i++) {
+    ctx.fillStyle = `rgba(90,65,30,${(rnd() * 0.06).toFixed(3)})`
+    ctx.fillRect(rnd() * w, rnd() * h, 1.5, 1.5)
+  }
+  const tex = new THREE.CanvasTexture(c)
+  tex.colorSpace = THREE.SRGBColorSpace
+  return track(tex)
+}
+
 const SCRAP_SCRIBBLES = ['✗', '→', '?', '△', '§', '#', '!']
 
 /** A tumbling background paper scrap with a scribble on it. */

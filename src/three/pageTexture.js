@@ -1462,7 +1462,7 @@ export function renderPageFace(face, side) {
   if (rnd() > 0.78) burnMark(ctx, rnd, rnd() > 0.5 ? W * 0.06 + rnd() * 40 : W * 0.94 - rnd() * 40, H * (0.2 + rnd() * 0.6), 18 + rnd() * 26)
 
   const hasTear = sheetProfile(Math.floor(face.faceIndex / 2)).tears.length > 0
-  if (!hasTear && rnd() > 0.72) foldedCorner(ctx, rnd, rnd() > 0.5 ? 'tr' : 'br', side, relief)
+  if (!hasTear && rnd() > 0.58) foldedCorner(ctx, rnd, rnd() > 0.5 ? 'tr' : 'br', side, relief)
 
   if (face.kind !== 'blank') {
     if (face.theme === 'title') {

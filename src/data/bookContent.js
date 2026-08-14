@@ -54,7 +54,7 @@ export const structural = {
         'Double-click anywhere else on the book → pick it up and spin it. Double-click again to set it down.',
         'Double-click the little ✦ seal at the foot of any page → the book’s own map opens.',
         'Click a photograph → it jumps up to meet you. Esc sends it back.',
-        'Arrow keys turn pages. R resets the view. That’s all the machinery.',
+        'Arrow keys turn pages. R resets the view. M silences the paper. That’s all the machinery.',
       ] },
       { type: 'note', text: 'nothing in here bites. probably.' },
     ],

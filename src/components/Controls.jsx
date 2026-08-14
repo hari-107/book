@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import { gsap } from 'gsap'
 import { CAMERA_MIN_Z, CAMERA_MAX_Z, FIT_HALF_W, FIT_HALF_H } from '../constants.js'
 import { useBookStore } from '../store/useBookStore.js'
+import { toggleMute } from '../utils/sound.js'
 
 /**
  * Camera + input layer. No UI is rendered here — this only wires:
@@ -19,7 +20,15 @@ export default function Controls() {
   const { camera, gl, size } = useThree()
   const zoom = useRef({ target: 3, fit: 3, push: 0 })
   const sway = useRef({ x: 0, y: 0 })
+  const intro = useRef({ t: 0 })
   const resetToken = useBookStore((s) => s.resetToken)
+  const phase = useBookStore((s) => s.phase)
+
+  // the reveal: drift in from the gloom above the desk onto the journal
+  useEffect(() => {
+    if (phase !== 'ready') return
+    gsap.to(intro.current, { t: 1, duration: 3.6, delay: 0.25, ease: 'power2.inOut' })
+  }, [phase])
 
   // Fit the book to the viewport: near-fullscreen at every aspect ratio.
   useEffect(() => {
@@ -137,6 +146,7 @@ export default function Controls() {
       if (e.key === 'ArrowRight') s.api?.next()
       else if (e.key === 'ArrowLeft') s.api?.prev()
       else if (e.key === 'r' || e.key === 'R') s.requestReset()
+      else if (e.key === 'm' || e.key === 'M') toggleMute()
       else if (e.key === 'Escape') s.escape()
     }
 
@@ -158,12 +168,15 @@ export default function Controls() {
 
   useFrame((_, dt) => {
     const k = Math.min(1, dt * 5)
-    const z = zoom.current.target + zoom.current.push
+    const it = intro.current.t
+    // during the intro the camera hangs back high in the gloom, then settles in
+    const z = (zoom.current.target + zoom.current.push) * (1 + (1 - it) * 0.85)
+    const baseY = 0.16 + (1 - it) * 0.85
     camera.position.z += (z - camera.position.z) * k
     // subtle parallax — sitting at the desk, leaning slightly with the pointer
-    camera.position.x += (sway.current.x * 0.09 - camera.position.x) * k * 0.6
-    camera.position.y += (0.16 - sway.current.y * 0.06 - camera.position.y) * k * 0.6
-    camera.lookAt(0, -0.04, 0)
+    camera.position.x += (sway.current.x * 0.09 * it - camera.position.x) * k * 0.6
+    camera.position.y += (baseY - sway.current.y * 0.06 * it - camera.position.y) * k * 0.6
+    camera.lookAt(0, -0.04 - (1 - it) * 0.3, 0)
   })
 
   return null

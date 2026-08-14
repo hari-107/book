@@ -11,6 +11,7 @@ import {
   photoCaptionTexture,
 } from '../three/proceduralTextures.js'
 import { GOLD } from '../constants.js'
+import { sfx } from '../utils/sound.js'
 
 /**
  * One photograph, treated like a physical print somebody tossed onto the
@@ -95,33 +96,99 @@ export default function FloatingImage({ img, slot, hidden, leaving, seed }) {
 
   const anim = useRef({ base: 0, vis: 0, hoverLift: 0 })
 
-  // ---- fly in: thrown from off the page, overshoot, slap, settle ---------
+  // ---- fly in with a personality: no two photos land the same way ---------
+  // 0 throw · 1 drop · 2 slide · 3 tumble · 4 flip · 5 toss-arc
   useEffect(() => {
     const g = groupRef.current
     if (!g) return
+    const persona = seed % 6
     const side = rnd() > 0.5 ? 1 : -1
-    const fromBottom = rnd() > 0.7
-    g.position.set(
-      fromBottom ? target.x + (rnd() - 0.5) * 0.6 : side * (2.4 + rnd() * 0.9),
-      fromBottom ? -1.9 : (rnd() - 0.5) * 1.7,
-      0.9 + rnd() * 0.4
-    )
-    g.rotation.set(0, 0, side * (0.9 + rnd() * 1.4))
-    g.scale.setScalar(1)
-
-    const overX = target.x + (target.x - g.position.x) * -0.06
-    const overY = target.y + 0.14 + rnd() * 0.08
-    const dur = 0.5 + rnd() * 0.25
-    const delay = slot * 0.13 + rnd() * 0.1
+    const delay = slot * 0.14 + rnd() * 0.1
     const tl = gsap.timeline({ delay })
     tl.to(anim.current, { base: 1, duration: 0.22 }, 0)
-    tl.to(g.position, { x: overX, y: overY, z: target.z + 0.22, duration: dur, ease: 'power2.out' }, 0)
-    tl.to(g.rotation, { z: target.rot + (rnd() - 0.5) * 0.5, duration: dur, ease: 'power2.out' }, 0)
-    // the slap
-    tl.to(g.position, { x: target.x, y: target.y, z: target.z, duration: 0.34, ease: 'back.out(2.6)' }, dur)
-    tl.to(g.rotation, { z: target.rot, duration: 0.42, ease: 'elastic.out(1, 0.45)' }, dur)
-    tl.to(g.scale, { x: 1.09, y: 0.94, z: 1, duration: 0.09, ease: 'power1.in' }, dur)
-    tl.to(g.scale, { x: 1, y: 1, z: 1, duration: 0.3, ease: 'elastic.out(1.2, 0.5)' }, dur + 0.09)
+    g.scale.setScalar(1)
+    g.rotation.set(0, 0, 0)
+
+    const squashSlap = (at, strength = 1) => {
+      tl.to(g.scale, { x: 1 + 0.09 * strength, y: 1 - 0.06 * strength, z: 1, duration: 0.08, ease: 'power1.in' }, at)
+      tl.to(g.scale, { x: 1, y: 1, z: 1, duration: 0.3, ease: 'elastic.out(1.2, 0.5)' }, at + 0.08)
+      tl.call(() => anim.current.base > 0.5 && sfx('slap'), null, at)
+    }
+
+    switch (persona) {
+      case 1: {
+        // DROP: falls from above, bounces on the parchment
+        g.position.set(target.x + (rnd() - 0.5) * 0.2, 2.1, target.z + 0.5)
+        g.rotation.z = (rnd() - 0.5) * 0.8
+        const dur = 0.62 + rnd() * 0.15
+        tl.to(g.position, { y: target.y, duration: dur, ease: 'bounce.out' }, 0)
+        tl.to(g.position, { x: target.x, z: target.z, duration: dur * 0.8, ease: 'power2.out' }, 0)
+        tl.to(g.rotation, { z: target.rot, duration: dur + 0.2, ease: 'elastic.out(1, 0.5)' }, 0)
+        squashSlap(dur * 0.55, 0.9)
+        break
+      }
+      case 2: {
+        // SLIDE: scrapes in across the parchment and stops at an angle
+        g.position.set(side * 2.5, target.y + (rnd() - 0.5) * 0.2, target.z + 0.015)
+        g.rotation.z = target.rot + side * 0.45
+        tl.to(g.position, { x: target.x, y: target.y, duration: 0.7, ease: 'power3.out' }, 0)
+        tl.to(g.position, { z: target.z, duration: 0.3, ease: 'power1.out' }, 0.4)
+        tl.to(g.rotation, { z: target.rot, duration: 0.75, ease: 'power2.out' }, 0)
+        tl.call(() => anim.current.base > 0.5 && sfx('flip'), null, 0.05)
+        break
+      }
+      case 3: {
+        // TUMBLE: enters from a corner, spinning full turns
+        g.position.set(side * 2.1, 1.7, 0.9)
+        g.rotation.z = side * Math.PI * 0.5
+        const dur = 0.85 + rnd() * 0.2
+        tl.to(g.position, { x: target.x, y: target.y, z: target.z, duration: dur, ease: 'power2.out' }, 0)
+        tl.to(g.rotation, { z: target.rot - side * Math.PI * 4, duration: dur, ease: 'power2.out' }, 0)
+        squashSlap(dur * 0.92, 0.8)
+        break
+      }
+      case 4: {
+        // FLIP: turns over mid-air like a card being dealt
+        g.position.set(target.x + side * 0.9, target.y + 0.5, 1.05)
+        g.rotation.set(0, Math.PI, (rnd() - 0.5) * 0.6)
+        const dur = 0.7 + rnd() * 0.15
+        tl.to(g.position, { x: target.x, y: target.y, z: target.z, duration: dur, ease: 'power3.out' }, 0)
+        tl.to(g.rotation, { y: 0, duration: dur, ease: 'power2.out' }, 0)
+        tl.to(g.rotation, { z: target.rot, duration: dur + 0.15, ease: 'elastic.out(1, 0.5)' }, 0)
+        squashSlap(dur * 0.9, 0.6)
+        break
+      }
+      case 5: {
+        // TOSS: a lazy arc up and over, tipping forward as it lands
+        g.position.set(target.x + side * 1.6, target.y - 0.7, 0.5)
+        g.rotation.set(-0.9, 0, target.rot + side * 0.7)
+        const mid = 0.38
+        tl.to(g.position, { x: target.x + side * 0.4, y: target.y + 0.45, z: 0.85, duration: mid, ease: 'power1.out' }, 0)
+        tl.to(g.position, { x: target.x, y: target.y, z: target.z, duration: 0.42, ease: 'power1.in' }, mid)
+        tl.to(g.rotation, { x: 0, z: target.rot, duration: mid + 0.42, ease: 'power2.out' }, 0)
+        squashSlap(mid + 0.42, 1)
+        break
+      }
+      default: {
+        // THROW: from the side, spin, overshoot, slap down (the classic)
+        const fromBottom = rnd() > 0.7
+        g.position.set(
+          fromBottom ? target.x + (rnd() - 0.5) * 0.6 : side * (2.4 + rnd() * 0.9),
+          fromBottom ? -1.9 : (rnd() - 0.5) * 1.7,
+          0.9 + rnd() * 0.4
+        )
+        g.rotation.z = side * (0.9 + rnd() * 1.4)
+        const overX = target.x + (target.x - g.position.x) * -0.06
+        const overY = target.y + 0.14 + rnd() * 0.08
+        const dur = 0.5 + rnd() * 0.25
+        tl.to(g.position, { x: overX, y: overY, z: target.z + 0.22, duration: dur, ease: 'power2.out' }, 0)
+        tl.to(g.rotation, { z: target.rot + (rnd() - 0.5) * 0.5, duration: dur, ease: 'power2.out' }, 0)
+        tl.to(g.position, { x: target.x, y: target.y, z: target.z, duration: 0.34, ease: 'back.out(2.6)' }, dur)
+        tl.to(g.rotation, { z: target.rot, duration: 0.42, ease: 'elastic.out(1, 0.45)' }, dur)
+        squashSlap(dur, 1)
+        break
+      }
+    }
     return () => tl.kill()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

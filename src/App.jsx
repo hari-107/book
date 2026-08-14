@@ -10,6 +10,7 @@ import { useBookStore } from './store/useBookStore.js'
 import { preloadImageTextures } from './three/imageCache.js'
 import { FACES } from './data/compileBook.js'
 import { CAMERA_DEFAULT_Z, CAMERA_FOV, DESK_Y } from './constants.js'
+import { initSound } from './utils/sound.js'
 
 /**
  * One page. One enormous old adventure book, alive on a desk in the gloom.
@@ -21,6 +22,7 @@ export default function App() {
   const setPhase = useBookStore((s) => s.setPhase)
 
   useEffect(() => {
+    initSound() // WebAudio unlocks on the first gesture; M mutes
     let alive = true
     async function preload() {
       try {

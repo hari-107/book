@@ -4,8 +4,8 @@ export const PAGE_W = 1.3 // page width (spine to fore-edge)
 export const PAGE_H = 1.7 // page height
 export const COVER_W = 1.37 // cover overhangs the pages
 export const COVER_H = 1.79
-export const COVER_T = 0.06 // thick leather board
-export const SHEET_T = 0.02 // chunky paper sheets
+export const COVER_T = 0.075 // thick leather board
+export const SHEET_T = 0.024 // chunky paper sheets
 
 // Interaction
 export const EDGE_ZONE = 0.15 // outer 15% of a page's width turns the page
@@ -17,11 +17,11 @@ export const PAGE_TEX_H = 1340
 // Camera — close, like sitting at a desk in front of the book.
 // (Controls recomputes the actual fit per viewport aspect.)
 export const CAMERA_FOV = 42
-export const CAMERA_DEFAULT_Z = 2.5
-export const CAMERA_MIN_Z = 1.8
-export const CAMERA_MAX_Z = 4.8
-export const FIT_HALF_W = 1.47 // half-width the camera must keep in frame
-export const FIT_HALF_H = 0.99 // half-height the camera must keep in frame
+export const CAMERA_DEFAULT_Z = 2.4
+export const CAMERA_MIN_Z = 1.65
+export const CAMERA_MAX_Z = 4.6
+export const FIT_HALF_W = 1.38 // half-width the camera must keep in frame (~90% spread)
+export const FIT_HALF_H = 0.91 // half-height the camera must keep in frame
 
 // The desk surface sits just under the book's bottom edge
 export const DESK_Y = -0.9

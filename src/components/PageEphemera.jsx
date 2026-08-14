@@ -6,18 +6,20 @@ import { useBookStore } from '../store/useBookStore.js'
 import {
   scrapDocumentTexture,
   paperScrapTexture,
+  themedScrapTexture,
   tapeTexture,
   shadowBlobTexture,
 } from '../three/proceduralTextures.js'
 import { GOLD } from '../constants.js'
 
 /**
- * Physical scrapbook layering: loose artifacts that sit slightly ABOVE the
- * page surface with real drop shadows — a taped torn document, stray paper
- * scraps, and (on the treasure spread) an old coin taped down with crossed
- * strips, reference-style. Each spread gets its own seeded arrangement and
- * the pieces drop onto the page when the spread settles. Non-interactive:
- * raycasts pass through to the page beneath.
+ * The scrapbook layer: what a person physically stuck onto THIS spread.
+ * Each section contributes its own artifacts — graph-paper sketches for the
+ * inventor pages, a blueprint fragment for projects, a redacted CLASSIFIED
+ * strip for field reports, sticky notes, expedition ticket stubs, a taped
+ * coin on the treasure spread, a red wax seal on the certificates. Pieces
+ * sit above the page with drop shadows, bounce-drop in when the spread
+ * settles, and idle with a faint peeling flutter. Raycasts pass through.
  */
 
 function mulberry32(a) {
@@ -34,6 +36,36 @@ const SPOTS = [
   [-1.02, 0.55], [1.05, -0.58], [-1.08, -0.5], [0.98, 0.6], [-0.35, -0.68], [0.4, 0.68],
 ]
 
+// what each section's pages accumulate
+const THEME_ITEMS = {
+  explorer: ['scrapDoc', 'sticky'],
+  inventor: ['graph', 'sticky'],
+  journal: ['ticket', 'scrapDoc'],
+  blueprint: ['blueprint', 'graph'],
+  stamps: ['seal', 'scrapDoc'],
+  treasure: ['coin', 'ticket'],
+  reports: ['classified', 'scrapDoc'],
+  scholar: ['graph', 'scrap'],
+  chaos: ['sticky', 'scrap', 'graph'],
+  letter: ['scrapDoc', 'sticky'],
+}
+
+function itemTexture(kind, seed) {
+  if (kind === 'scrapDoc') return scrapDocumentTexture(seed)
+  if (kind === 'scrap') return paperScrapTexture(seed % 7)
+  return themedScrapTexture(kind, seed)
+}
+
+const ITEM_SIZE = {
+  scrapDoc: [0.34, 0.43],
+  scrap: [0.22, 0.27],
+  graph: [0.3, 0.22],
+  blueprint: [0.32, 0.24],
+  classified: [0.3, 0.22],
+  sticky: [0.2, 0.16],
+  ticket: [0.3, 0.22],
+}
+
 export default function PageEphemera({ spread, visibleFaces, stackTopZ }) {
   const isOpen = useBookStore((s) => s.isOpen)
   const navOpen = useBookStore((s) => s.navOpen)
@@ -46,27 +78,34 @@ export default function PageEphemera({ spread, visibleFaces, stackTopZ }) {
 
   const items = useMemo(() => {
     const rnd = mulberry32(spread * 104729 + 7)
-    const out = []
-    const count = 1 + Math.floor(rnd() * 2)
-    for (let i = 0; i < count; i++) {
-      const spot = SPOTS[Math.floor(rnd() * SPOTS.length)]
-      const isDoc = rnd() > 0.45
-      out.push({
-        kind: isDoc ? 'doc' : 'scrap',
-        tex: isDoc ? scrapDocumentTexture(Math.floor(rnd() * 100)) : paperScrapTexture(Math.floor(rnd() * 7)),
+    const kinds = []
+    for (const f of visibleFaces) {
+      const list = THEME_ITEMS[f.theme]
+      if (list) kinds.push(list[Math.floor(rnd() * list.length)])
+    }
+    // occasionally one extra generic scrap
+    if (rnd() > 0.55) kinds.push(rnd() > 0.5 ? 'scrap' : 'scrapDoc')
+
+    const used = new Set()
+    return kinds.slice(0, 3).map((kind, i) => {
+      let spotIdx = Math.floor(rnd() * SPOTS.length)
+      while (used.has(spotIdx)) spotIdx = (spotIdx + 1) % SPOTS.length
+      used.add(spotIdx)
+      const spot = SPOTS[spotIdx]
+      const is3D = kind === 'coin' || kind === 'seal'
+      const [w, h] = ITEM_SIZE[kind] || [0.26, 0.26]
+      return {
+        kind,
+        tex: is3D ? null : itemTexture(kind, Math.floor(rnd() * 100)),
         x: spot[0] + (rnd() - 0.5) * 0.16,
         y: spot[1] + (rnd() - 0.5) * 0.12,
         rot: (rnd() - 0.5) * 0.5,
-        w: isDoc ? 0.34 : 0.22,
-        h: isDoc ? 0.43 : 0.27,
-        taped: rnd() > 0.35,
-      })
-    }
-    // the taped coin artifact on the treasure spread
-    if (visibleFaces.some((f) => f.theme === 'treasure')) {
-      out.push({ kind: 'coin', x: 0.88, y: -0.42, rot: rnd() * Math.PI, w: 0.2, h: 0.2, taped: true })
-    }
-    return out
+        w,
+        h,
+        taped: kind !== 'coin' && kind !== 'seal' && rnd() > 0.3,
+        phase: rnd() * Math.PI * 2,
+      }
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spread])
 
@@ -82,12 +121,17 @@ export default function PageEphemera({ spread, visibleFaces, stackTopZ }) {
     })
   }, [items])
 
-  useFrame((_, dt) => {
+  useFrame(({ clock }, dt) => {
     const g = groupRef.current
     if (!g) return
+    const t = clock.getElapsedTime()
     const target = isOpen && !navOpen && !turning ? 1 : 0
     fade.current += (target - fade.current) * Math.min(1, dt * 5)
     g.visible = fade.current > 0.02
+    g.children.forEach((child, i) => {
+      const it = items[i]
+      if (it) child.rotation.z = it.rot + Math.sin(t * 1.1 + it.phase) * 0.012 // corner-peel flutter
+    })
     g.traverse((o) => {
       if (o.material && o.userData.fades) o.material.opacity = o.userData.baseOpacity * fade.current
     })
@@ -103,18 +147,16 @@ export default function PageEphemera({ spread, visibleFaces, stackTopZ }) {
             <meshBasicMaterial map={shadowTex} transparent opacity={0} depthWrite={false} />
           </mesh>
 
-          {it.kind === 'coin' ? (
+          {it.kind === 'coin' && (
             <>
               <mesh raycast={() => null} rotation={[Math.PI / 2, 0, 0]} userData={{ fades: false }}>
                 <cylinderGeometry args={[0.095, 0.095, 0.014, 28]} />
                 <meshStandardMaterial color={GOLD} metalness={0.7} roughness={0.5} />
               </mesh>
-              {/* embossed-ish center */}
               <mesh position={[0, 0, 0.008]} raycast={() => null} userData={{ fades: false }}>
                 <ringGeometry args={[0.045, 0.075, 24]} />
                 <meshStandardMaterial color="#8a6a2c" metalness={0.65} roughness={0.55} />
               </mesh>
-              {/* crossed tape strips, reference-style */}
               {[0.8, -0.8].map((r, k) => (
                 <mesh key={k} position={[0, 0, 0.016]} rotation={[0, 0, r]} raycast={() => null} userData={{ fades: true, baseOpacity: 0.85 }}>
                   <planeGeometry args={[0.3, 0.07]} />
@@ -122,7 +164,16 @@ export default function PageEphemera({ spread, visibleFaces, stackTopZ }) {
                 </mesh>
               ))}
             </>
-          ) : (
+          )}
+
+          {it.kind === 'seal' && (
+            <mesh raycast={() => null} rotation={[Math.PI / 2, 0, 0]} userData={{ fades: false }}>
+              <cylinderGeometry args={[0.075, 0.085, 0.012, 22]} />
+              <meshStandardMaterial color="#7e2318" metalness={0.15} roughness={0.55} />
+            </mesh>
+          )}
+
+          {it.kind !== 'coin' && it.kind !== 'seal' && (
             <>
               <mesh raycast={() => null} userData={{ fades: true, baseOpacity: 1 }}>
                 <planeGeometry args={[it.w, it.h]} />

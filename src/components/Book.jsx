@@ -15,6 +15,8 @@ import { createSheetUniforms } from '../three/bendMaterial.js'
 import { buildSheetGeometries, disposeSheetGeometries } from '../three/sheetGeometry.js'
 import { tearShadowSpots } from '../three/tearProfiles.js'
 import PageEphemera from './PageEphemera.jsx'
+import PageDecoAnimations from './PageDecoAnimations.jsx'
+import { sfx } from '../utils/sound.js'
 import { useBookStore } from '../store/useBookStore.js'
 import { FrontCover, BackCover } from './Cover.jsx'
 import Spine from './Spine.jsx'
@@ -152,7 +154,7 @@ export default function Book() {
     const s = useBookStore.getState()
     if (s.isOpen || s.opening) return
     s.setOpening(true)
-    // heavy, mechanical — an old spine resisting, then giving way
+    sfx('creak') // an old spine resisting, then giving way
     gsap.to(openRef.current, {
       p: 1,
       duration: 2.3,
@@ -175,6 +177,7 @@ export default function Book() {
       const sheet = dir > 0 ? cur : cur - 1
       turnBusy.current = true
       s.setTurning(true)
+      sfx('flip')
 
       const mats = sheetMaterialsRef.current
       if (mats) {
@@ -249,6 +252,26 @@ export default function Book() {
   useEffect(() => {
     gsap.to(liftRef.current, { v: held ? 1 : 0, duration: 0.65, ease: 'power2.out' })
   }, [held])
+
+  // intro reveal: the closed journal settles from a skewed rest pose as the
+  // camera drifts in, and the leather stirs once it lands
+  useEffect(() => {
+    const g = dragRef.current
+    if (!g) return
+    g.rotation.set(0.12, 0.45, -0.04)
+    const q0 = g.quaternion.clone()
+    const q1 = new THREE.Quaternion()
+    const proxy = { t: 0 }
+    gsap.to(proxy, {
+      t: 1,
+      duration: 3.6,
+      delay: 0.25,
+      ease: 'power2.inOut',
+      onUpdate: () => g.quaternion.slerpQuaternions(q0, q1, proxy.t),
+      onComplete: () => nudge(0.5),
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // reset-to-default orientation
   useEffect(() => {
@@ -362,6 +385,7 @@ export default function Book() {
         if (egg) {
           // DO NOT PRESS was pressed. Naturally.
           s.triggerEgg()
+          sfx('pop')
           nudge(2.2)
           return
         }
@@ -469,6 +493,7 @@ export default function Book() {
 
             <FloatingImages visibleFaces={visibleFaces} />
             <PageEphemera spread={spread} visibleFaces={visibleFaces} stackTopZ={Math.max(effLeft, effRight) * SHEET_T} />
+            <PageDecoAnimations spread={spread} visibleFaces={visibleFaces} stackTopZ={Math.max(effLeft, effRight) * SHEET_T} />
             <BookNavigation z={navZ} />
           </group>
           </group>

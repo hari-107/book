@@ -56,7 +56,10 @@ Requires Node.js 18+.
 | Mouse wheel / pinch | Zoom (clamped) |
 | `→` / `←` | Next / previous page |
 | `R` | Reset orientation and zoom |
+| `M` | Mute the paper (all sounds are synthesized WebAudio foley — no audio files) |
 | `Esc` | Release a focused photo, then close the map |
+| Click the **compass** on the About pages | The needle spins |
+| Click a **section stamp** | It stamps itself again |
 | A certain button that says **DO NOT PRESS** | Absolutely nothing. Definitely don't try it |
 
 Edge zones glow softly on hover. They stay live while the book is held.

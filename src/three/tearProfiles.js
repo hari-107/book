@@ -76,6 +76,12 @@ function bottomBite(x, r, seed) {
   return { c: [x * PAGE_W, -PAGE_H / 2], th0: 0, th1: Math.PI, R, seed }
 }
 
+function foreEdgeRip(y, r, seed) {
+  const rr = r * PAGE_W
+  const R = (t) => rr * raggedFactor(t, 8 + seed * 7)
+  return { c: [PAGE_W, y * PAGE_H], th0: Math.PI * 0.5, th1: Math.PI * 1.5, R, seed }
+}
+
 const profileCache = new Map()
 
 /** Damage profile for sheet j — deterministic, cached. */
@@ -85,8 +91,9 @@ export function sheetProfile(j) {
   const deckleSeed = rnd() * 100
   const tears = []
   if (j === 2) tears.push(cornerTear('tr', 0.2, rnd()))
+  if (j === 3) tears.push(foreEdgeRip(0.08, 0.13, rnd())) // ripped outer edge
   if (j === 5) tears.push(cornerTear('br', 0.24, rnd()))
-  if (j === 8) tears.push(cornerTear('tr', 0.16, rnd()))
+  if (j === 6) tears.push(cornerTear('br', 0.42, rnd())) // huge diagonal tear
   if (j === 10) tears.push(bottomBite(0.48, 0.13, rnd()))
   const profile = { deckleSeed, tears }
   profileCache.set(j, profile)
