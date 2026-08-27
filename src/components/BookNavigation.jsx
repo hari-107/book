@@ -60,9 +60,10 @@ function buildNavTexture() {
   const margin = 86
   const gap = 60
   const colW = (CW - margin * 2 - gap) / 2
-  const rowH = 62
   const topY = 262
+  const bottomY = CH - 80
   const perCol = Math.ceil(NAV_ITEMS.length / 2)
+  const rowH = perCol > 1 ? Math.min(62, (bottomY - topY) / (perCol - 1)) : 0
 
   NAV_ITEMS.forEach((item, i) => {
     const col = Math.floor(i / perCol)

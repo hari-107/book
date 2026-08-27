@@ -18,7 +18,7 @@ import { toggleMute } from '../utils/sound.js'
  */
 export default function Controls() {
   const { camera, gl, size } = useThree()
-  const zoom = useRef({ target: 3, fit: 3, push: 0, closedPull: 0.32 })
+  const zoom = useRef({ target: 3, fit: 3, max: CAMERA_MAX_Z, push: 0, closedPull: 0.32 })
   const sway = useRef({ x: 0, y: 0 })
   const intro = useRef({ t: 0 })
   const resetToken = useBookStore((s) => s.resetToken)
@@ -36,8 +36,9 @@ export default function Controls() {
     const aspect = size.width / size.height
     const zForH = FIT_HALF_H / halfFovTan
     const zForW = FIT_HALF_W / (halfFovTan * aspect)
-    const fit = THREE.MathUtils.clamp(Math.max(zForH, zForW) * 1.04, CAMERA_MIN_Z, CAMERA_MAX_Z)
+    const fit = Math.max(Math.max(zForH, zForW) * 1.04, CAMERA_MIN_Z)
     zoom.current.fit = fit
+    zoom.current.max = Math.max(CAMERA_MAX_Z, fit)
     zoom.current.target = fit
   }, [camera, size])
 
@@ -105,7 +106,7 @@ export default function Controls() {
           zoom.current.target = THREE.MathUtils.clamp(
             zoom.current.target * (pinchDist / d),
             CAMERA_MIN_Z,
-            CAMERA_MAX_Z
+            zoom.current.max
           )
         }
         pinchDist = d
@@ -142,7 +143,7 @@ export default function Controls() {
       zoom.current.target = THREE.MathUtils.clamp(
         zoom.current.target + e.deltaY * 0.0016,
         CAMERA_MIN_Z,
-        CAMERA_MAX_Z
+        zoom.current.max
       )
     }
 
